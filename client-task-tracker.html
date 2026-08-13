@@ -1,0 +1,1200 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title id="pageTitle">客户任务追踪</title>
+<style>
+  :root {
+    --ink: #1c2733; --ink-soft: #4a5568; --paper: #f3f5f7; --paper-raised: #ffffff; --line: #d8dde3;
+    --bas: #1f7a6c; --bas-bg: #e6f2ef; --ret: #a8641a; --ret-bg: #fbeee0; --oth: #5b4b9e; --oth-bg: #ede9f7;
+    --danger: #b03a2e; --danger-bg: #fbe9e6; --ok: #2e7d46;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif; background: var(--paper); color: var(--ink); -webkit-font-smoothing: antialiased; }
+  .app { max-width: 720px; margin: 0 auto; padding: 20px 16px 80px; }
+  header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 18px; gap: 10px; flex-wrap: wrap; }
+  header h1 { font-size: 20px; font-weight: 700; margin: 0; letter-spacing: -0.01em; }
+  header .today { font-size: 12px; color: var(--ink-soft); font-variant-numeric: tabular-nums; }
+  .header-right { display: flex; align-items: center; gap: 8px; }
+  .icon-btn {
+    border: 1px solid var(--line); background: #fff; border-radius: 8px; height: 32px; min-width: 32px; padding: 0 9px;
+    font-size: 13px; font-weight: 700; cursor: pointer; display: flex; align-items: center; justify-content: center; color: var(--ink-soft);
+  }
+  .backup-reminder { font-size: 11.5px; color: var(--ret); background: var(--ret-bg); padding: 7px 11px; border-radius: 8px; margin: -8px 0 16px; }
+  .footer-credit { text-align: center; font-size: 11.5px; color: #b0b8c1; margin-top: 28px; }
+
+  .tabs { display: flex; gap: 6px; margin-bottom: 16px; border-bottom: 1px solid var(--line); }
+  .tab { flex: 1; text-align: center; padding: 9px 4px; font-size: 13px; font-weight: 600; color: var(--ink-soft); cursor: pointer; border-bottom: 2px solid transparent; user-select: none; }
+  .tab.active { color: var(--ink); border-bottom-color: var(--ink); }
+
+  .search { margin-bottom: 10px; }
+  .search input { width: 100%; padding: 10px 12px; border: 1px solid var(--line); border-radius: 9px; font-size: 13.5px; background: #fff; }
+
+  .chip-row { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 14px; }
+  .chip { padding: 7px 13px; border: 1px solid var(--line); background: #fff; border-radius: 20px; font-size: 12.5px; font-weight: 600; color: var(--ink-soft); cursor: pointer; }
+  .chip.sel { background: var(--ink); color: #fff; border-color: var(--ink); }
+  .chip.add-chip { width: 34px; padding: 7px 0; text-align: center; font-weight: 700; }
+
+  .section-label { font-size: 11px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--ink-soft); margin: 18px 0 8px 2px; }
+  .type-badge { display: inline-block; font-size: 10.5px; font-weight: 700; padding: 2px 7px; border-radius: 20px; letter-spacing: 0.02em; }
+  .type-BAS { background: var(--bas-bg); color: var(--bas); }
+  .type-Return { background: var(--ret-bg); color: var(--ret); }
+  .type-Other { background: var(--oth-bg); color: var(--oth); }
+
+  .task-row { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+  .card { background: var(--paper-raised); border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; margin-bottom: 0; display: flex; align-items: center; gap: 10px; cursor: pointer; flex: 1; min-width: 0; }
+  .del-btn-outside { border: none; background: var(--danger); color: #fff; border-radius: 8px; width: 34px; height: 34px; font-size: 14px; cursor: pointer; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+  .card.overdue { border-color: var(--danger); background: var(--danger-bg); }
+  .card.not-started { opacity: 0.55; background: #eceef0; }
+  .card .main { flex: 1; min-width: 0; }
+  .client-row { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }
+  .card .client { font-size: 14.5px; font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; gap: 5px; }
+  .card .client:hover { text-decoration: underline; text-decoration-style: dotted; }
+  .note-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--oth); display: inline-block; }
+  .task-note-preview { font-size: 12px; color: #9aa4af; font-weight: 400; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 220px; }
+  .linked-tag { font-size: 11.5px; color: var(--ink-soft); font-weight: 500; }
+  .card .meta { font-size: 12px; color: var(--ink-soft); display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin-top: 3px; }
+  .card .period { font-variant-numeric: tabular-nums; }
+  .created-tag { font-size: 10.5px; color: #9aa4af; }
+  .who { font-size: 11px; padding: 1px 6px; border-radius: 5px; background: #eef0f2; color: var(--ink-soft); font-weight: 600; }
+  .due-tag { font-size: 11px; color: var(--danger); font-weight: 700; }
+  .ns-tag { font-size: 11px; color: #7a8492; font-weight: 700; }
+
+  .btn-group { display: flex; gap: 6px; flex-shrink: 0; align-items: center; }
+  .status-select { border: 1px solid var(--line); border-radius: 8px; padding: 7px 5px; font-size: 11px; background: #fff; color: var(--ink-soft); max-width: 108px; }
+  .done-btn { border: none; border-radius: 8px; padding: 8px 12px; font-size: 12.5px; font-weight: 700; cursor: pointer; transition: transform .06s ease; }
+  .done-btn:active { transform: scale(0.96); }
+  .done-btn.pending { background: var(--ink); color: #fff; }
+  .done-btn.not_started { background: #dde1e5; color: #98a1ab; cursor: default; }
+
+  .empty { text-align: center; color: var(--ink-soft); font-size: 13px; padding: 30px 10px; border: 1px dashed var(--line); border-radius: 10px; }
+
+  .fab { position: fixed; bottom: 20px; right: 50%; transform: translateX(360px); background: var(--ink); color: #fff; border: none; border-radius: 50px; width: 52px; height: 52px; font-size: 26px; cursor: pointer; box-shadow: 0 6px 16px rgba(0,0,0,0.2); display: flex; align-items: center; justify-content: center; }
+  @media (max-width: 780px) { .fab { right: 20px; transform: none; } }
+
+  .modal-backdrop { position: fixed; inset: 0; background: rgba(20,25,30,0.45); display: none; align-items: flex-end; justify-content: center; z-index: 50; }
+  .modal-backdrop.open { display: flex; }
+  .modal { background: var(--paper-raised); width: 100%; max-width: 480px; border-radius: 16px 16px 0 0; padding: 20px 18px 26px; animation: slideup .18s ease; max-height: 88vh; overflow-y: auto; }
+  @media (min-width: 560px) { .modal-backdrop { align-items: center; } .modal { border-radius: 16px; } }
+  @keyframes slideup { from { transform: translateY(20px); opacity: 0 } to { transform: translateY(0); opacity: 1 } }
+  .modal h2 { font-size: 16px; margin: 0 0 14px; }
+  .modal p { font-size: 13.5px; color: var(--ink-soft); line-height: 1.5; }
+  .field { margin-bottom: 12px; }
+  .field label { display: block; font-size: 12px; font-weight: 700; color: var(--ink-soft); margin-bottom: 5px; }
+  .field input, .field select, .field textarea { width: 100%; padding: 9px 10px; border: 1px solid var(--line); border-radius: 8px; font-size: 14px; background: #fff; color: var(--ink); font-family: inherit; }
+  .field textarea { resize: vertical; min-height: 70px; }
+  .checkbox-row { display: flex; align-items: center; gap: 8px; }
+  .checkbox-row input { width: auto; }
+  .checkbox-row label { margin: 0; font-size: 13px; font-weight: 600; color: var(--ink); }
+  .seg { display: flex; gap: 6px; }
+  .seg button { flex: 1; padding: 9px; border: 1px solid var(--line); background: #fff; border-radius: 8px; font-size: 12.5px; font-weight: 600; cursor: pointer; color: var(--ink-soft); }
+  .seg button.sel { background: var(--ink); color: #fff; border-color: var(--ink); }
+  .modal-actions { display: flex; gap: 8px; margin-top: 16px; }
+  .modal-actions button { flex: 1; padding: 11px; border-radius: 8px; border: none; font-size: 14px; font-weight: 700; cursor: pointer; }
+  .btn-cancel { background: #eef0f2; color: var(--ink-soft); }
+  .btn-save { background: var(--ink); color: #fff; }
+  .btn-danger { background: var(--danger-bg); color: var(--danger); }
+
+  .archive-toolbar { display: flex; gap: 8px; margin-bottom: 10px; }
+  .archive-toolbar .seg { flex: 1; }
+  .archive-row { display: flex; justify-content: space-between; align-items: center; padding: 9px 2px; border-bottom: 1px solid var(--line); font-size: 13px; gap: 8px; }
+  .archive-row .ac-right { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+  .archive-row .ac-date { color: var(--ink-soft); font-size: 11.5px; white-space: nowrap; }
+  .restore-btn { border: 1px solid var(--line); background: #fff; color: var(--ink-soft); border-radius: 6px; padding: 4px 8px; font-size: 11px; font-weight: 700; cursor: pointer; white-space: nowrap; }
+  .archive-group-label { font-size: 11.5px; font-weight: 700; color: var(--ink-soft); margin: 14px 0 4px 2px; }
+
+  .toast { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%); background: var(--ink); color: #fff; padding: 9px 16px; border-radius: 30px; font-size: 12.5px; opacity: 0; pointer-events: none; transition: opacity .2s ease; z-index: 60; }
+  .toast.show { opacity: 1; }
+  .undo-bar { position: fixed; bottom: 24px; left: 20px; background: var(--ink); color: #fff; padding: 10px 10px 10px 16px; border-radius: 30px; font-size: 12.5px; display: flex; align-items: center; gap: 10px; opacity: 0; pointer-events: none; transform: translateY(6px); transition: opacity .2s ease, transform .2s ease; z-index: 60; }
+  .undo-bar.show { opacity: 1; pointer-events: auto; transform: translateY(0); }
+  .undo-bar button { background: #fff; color: var(--ink); border: none; border-radius: 20px; padding: 6px 12px; font-weight: 700; font-size: 12px; cursor: pointer; }
+</style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <h1 data-i18n="appTitle">客户任务追踪</h1>
+    <div class="header-right">
+      <div class="today" id="todayLabel"></div>
+      <button class="icon-btn" id="langToggleBtn">EN</button>
+      <button class="icon-btn" id="exportBtn" title="Export">⬆</button>
+      <button class="icon-btn" id="importBtn" title="Import">⬇</button>
+      <input type="file" id="importFile" accept="application/json" style="display:none;">
+    </div>
+  </header>
+
+  <div id="backupReminderBar" class="backup-reminder" style="display:none;"></div>
+
+  <div class="tabs">
+    <div class="tab active" data-tab="active" data-i18n="tabActive">进行中</div>
+    <div class="tab" data-tab="archive" data-i18n="tabArchive">历史记录</div>
+  </div>
+
+  <div id="activeSearchWrap" class="search"><input id="activeSearch" data-i18n-placeholder="searchActivePlaceholder" placeholder="搜索客户名..."></div>
+  <div id="whoFilterRow" class="chip-row"></div>
+  <div id="activeView"></div>
+
+  <div id="archiveView" style="display:none;">
+    <div class="search"><input id="archiveSearch" data-i18n-placeholder="searchArchivePlaceholder" placeholder="搜索客户名 / 任务..."></div>
+    <div class="archive-toolbar">
+      <div class="seg" id="archiveSort">
+        <button data-v="time" class="sel" data-i18n="sortTime">按时间</button>
+        <button data-v="client" data-i18n="sortClient">按客户</button>
+      </div>
+    </div>
+    <div id="archiveList"></div>
+  </div>
+
+  <div class="footer-credit" data-i18n="footerCredit">本软件由猫猫幻雪与Claude共同完成喵o( •w• )o</div>
+</div>
+
+<button class="fab" id="addBtn">+</button>
+
+<div class="modal-backdrop" id="modalBackdrop">
+  <div class="modal">
+    <h2 data-i18n="modalAddTitle">新增任务</h2>
+    <div class="field">
+      <label data-i18n="labelClient">客户名</label>
+      <input id="f-client" data-i18n-placeholder="placeholderClient" placeholder="例如 ABC Pty Ltd">
+    </div>
+    <div class="field checkbox-row">
+      <input type="checkbox" id="f-linked-check">
+      <label for="f-linked-check" data-i18n="labelLinked">关联客户</label>
+    </div>
+    <div class="field" id="f-linked-wrap" style="display:none;">
+      <label data-i18n="labelLinkedName">关联客户名</label>
+      <input id="f-linked-name" data-i18n-placeholder="placeholderLinkedName" placeholder="例如 ABC Holdings Pty Ltd">
+    </div>
+    <div class="field">
+      <label data-i18n="labelType">任务类型</label>
+      <div class="seg" id="f-type">
+        <button data-v="BAS" class="sel" data-i18n="typeBAS">BAS(季度)</button>
+        <button data-v="Return" data-i18n="typeReturn">Return(年度)</button>
+        <button data-v="Other" data-i18n="typeOther">其他</button>
+      </div>
+    </div>
+    <div class="field" id="f-quarter-wrap">
+      <label data-i18n="labelQuarter">选择季度</label>
+      <div class="seg" id="f-quarter">
+        <button data-v="-1" data-i18n="qPrev">上季度</button>
+        <button data-v="0" class="sel" data-i18n="qCurrent">本季度</button>
+        <button data-v="1" data-i18n="qNext">下季度</button>
+      </div>
+    </div>
+    <div class="field" id="f-fy-wrap" style="display:none;">
+      <label data-i18n="labelFY">选择财年</label>
+      <div style="display:flex;align-items:center;gap:6px;">
+        <span style="font-size:13px;font-weight:600;color:var(--ink-soft);">FY</span>
+        <input type="number" id="f-fy-start" style="width:64px;" placeholder="25">
+        <span style="font-size:13px;font-weight:600;color:var(--ink-soft);" data-i18n="fyTo">to</span>
+        <span style="font-size:13px;font-weight:600;color:var(--ink-soft);">FY</span>
+        <input type="number" id="f-fy-end" style="width:64px;" placeholder="26">
+      </div>
+      <div id="fyError" style="color:var(--danger);font-size:12px;margin-top:5px;display:none;"></div>
+    </div>
+    <div class="field" id="f-other-wrap" style="display:none;">
+      <label data-i18n="labelOtherDesc">任务描述</label>
+      <input id="f-other-desc" data-i18n-placeholder="placeholderOtherDesc" placeholder="例如 申请ABN / 做会议纪要 / 回电话">
+    </div>
+    <div class="field">
+      <label data-i18n="labelWho">负责人</label>
+      <div class="chip-row" id="f-who-chips" style="margin-bottom:0;"></div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn-cancel" id="cancelBtn" data-i18n="btnCancel">取消</button>
+      <button class="btn-save" id="saveBtn" data-i18n="btnAdd">添加</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-backdrop" id="noteModalBackdrop">
+  <div class="modal">
+    <h2 id="noteModalTitle">客户备注</h2>
+    <div class="field"><textarea id="noteText" data-i18n-placeholder="notePlaceholder" placeholder="记点什么,比如这客人超好 / 明年小心..."></textarea></div>
+    <div class="modal-actions">
+      <button class="btn-danger" id="noteDeleteBtn" data-i18n="btnDeleteNote">删除备注</button>
+      <button class="btn-save" id="noteSaveBtn" data-i18n="btnSave">保存</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-backdrop" id="taskNoteModalBackdrop">
+  <div class="modal">
+    <h2 id="taskNoteModalTitle">任务备注</h2>
+    <div class="field"><textarea id="taskNoteText" data-i18n-placeholder="taskNotePlaceholder" placeholder="记录这个任务的相关信息,比如在等文件、可以开始了..."></textarea></div>
+    <div class="modal-actions">
+      <button class="btn-danger" id="taskNoteDeleteBtn" data-i18n="btnDeleteNote">删除备注</button>
+      <button class="btn-save" id="taskNoteSaveBtn" data-i18n="btnSave">保存</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-backdrop" id="addPersonModalBackdrop">
+  <div class="modal">
+    <h2 data-i18n="addPersonModalTitle">新增负责人</h2>
+    <div class="field"><input id="newPersonName" data-i18n-placeholder="placeholderPersonName" placeholder="输入名字"></div>
+    <div class="modal-actions">
+      <button class="btn-cancel" id="addPersonCancelBtn" data-i18n="btnCancel">取消</button>
+      <button class="btn-save" id="addPersonSaveBtn" data-i18n="btnAdd">添加</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-backdrop" id="deleteConfirmModalBackdrop">
+  <div class="modal">
+    <h2 data-i18n="deleteConfirmTitle">删除任务</h2>
+    <p id="deleteConfirmBody"></p>
+    <div class="modal-actions">
+      <button class="btn-cancel" id="deleteCancelBtn" data-i18n="btnCancel">取消</button>
+      <button class="btn-danger" id="deleteConfirmBtn" data-i18n="btnDelete">删除</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-backdrop" id="staffManageModalBackdrop">
+  <div class="modal">
+    <h2 data-i18n="manageStaffTitle">管理负责人</h2>
+    <div id="staffManageList"></div>
+    <div class="modal-actions">
+      <button class="btn-save" id="staffManageCloseBtn" data-i18n="btnClose">完成</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-backdrop" id="updateModalBackdrop">
+  <div class="modal">
+    <h2 data-i18n="updateAvailableTitle">有新版本喵!</h2>
+    <p><span data-i18n="updateVersionLabel">版本</span> <strong id="updateVersionText"></strong></p>
+    <ul id="updateNotesList" style="font-size:13.5px;color:var(--ink-soft);line-height:1.6;padding-left:18px;margin:8px 0 12px;"></ul>
+    <p style="color:var(--danger);font-weight:600;font-size:13px;" data-i18n="updateBackupWarning">强烈建议先导出一份备份,谨防意外</p>
+    <div class="modal-actions" style="margin-top:8px;">
+      <button class="btn-cancel" id="updateBackupBtn" data-i18n="updateBackupBtn">导出备份</button>
+    </div>
+    <div id="updateRollbackWrap" style="display:none;margin-top:10px;font-size:12.5px;">
+      <a id="updateRollbackLink" href="#" target="_blank" style="color:var(--ink-soft);" data-i18n="updateRollbackLinkText">如果新版本有问题,点此回到上一版本</a>
+    </div>
+    <div class="modal-actions">
+      <button class="btn-cancel" id="updateDismissBtn" data-i18n="updateLater">稍后</button>
+      <button class="btn-save" id="updateReloadBtn" data-i18n="updateReload" disabled style="opacity:0.5;cursor:default;">立即更新</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+<div class="undo-bar" id="undoBar">
+  <span id="undoMsg" data-i18n="undoMsg">已完成并归档</span>
+  <button id="undoBtn" data-i18n="undoBtn">撤回</button>
+</div>
+
+<script>
+const STORAGE_KEY = 'tasks-v1';
+const ARCHIVE_KEY = 'archive-v1';
+const NOTES_KEY = 'client-notes-v1';
+const STAFF_KEY = 'staff-list-v1';
+const LANG_KEY = 'lang-pref-v1';
+const LAST_EXPORT_KEY = 'last-export-at-v1';
+// Bump APP_VERSION on every release. Point VERSION_CHECK_URL at a version.json file hosted
+// alongside this html (e.g. on GitHub Pages) once you set that up - leave it blank to disable
+// the update-check entirely (the app works fine either way).
+const APP_VERSION = '1.0.0';
+const VERSION_CHECK_URL = '';
+
+// DATA_VERSION is separate from APP_VERSION: bump this only when the *shape* of saved data
+// changes (a field renamed/restructured - not just a new optional field added, since
+// normalizeTask/normalizeArchiveEntry already handle new-optional-field cases on their own).
+// Add a migration function keyed by the version it migrates FROM. Each migration receives
+// { tasks, archive, clientNotes, staffList } and must return the same shape, transformed.
+// Example for a future breaking change:
+//   DATA_MIGRATIONS[1] = (b) => {
+//     b.tasks = b.tasks.map(t => { if (t.dueDate) { t.due = t.dueDate; delete t.dueDate; } return t; });
+//     return b;
+//   };
+const DATA_VERSION = 1;
+const SCHEMA_KEY = 'data-schema-version-v1';
+const DATA_MIGRATIONS = {};
+function migrateBundle(bundle, fromVersion){
+  let v = fromVersion || 1;
+  let guard = 0;
+  while (v < DATA_VERSION && DATA_MIGRATIONS[v] && guard < 50){
+    bundle = DATA_MIGRATIONS[v](bundle);
+    v++;
+    guard++;
+  }
+  return bundle;
+}
+let tasks = [];
+let archive = [];
+let clientNotes = {};
+let staffList = [];
+let lastAction = null;
+let undoTimeout = null;
+let archiveSortMode = 'time';
+let currentLang = 'zh';
+let selectedWhoFilter = null;
+
+// ---------- i18n ----------
+const I18N = {
+  zh: {
+    appTitle: '客户任务追踪', tabActive: '进行中', tabArchive: '历史记录',
+    searchActivePlaceholder: '搜索客户名...', searchArchivePlaceholder: '搜索客户名 / 任务...',
+    sortTime: '按时间', sortClient: '按客户',
+    modalAddTitle: '新增任务', labelClient: '客户名', placeholderClient: '例如 ABC Pty Ltd',
+    labelLinked: '关联客户', labelLinkedName: '关联客户名', placeholderLinkedName: '例如 ABC Holdings Pty Ltd',
+    labelType: '任务类型', typeBAS: 'BAS(季度)', typeReturn: 'Return(年度)', typeOther: '其他',
+    labelQuarter: '选择季度', qPrev: '上季度', qCurrent: '本季度', qNext: '下季度',
+    labelFY: '选择财年', fyTo: 'to', fyErrorMsg: '填写内容大于一年喵', toastNeedFY: '请填写完整的财年喵',
+    labelOtherDesc: '任务描述', placeholderOtherDesc: '例如 申请ABN / 做会议纪要 / 回电话',
+    labelWho: '负责人', btnCancel: '取消', btnAdd: '添加', btnSave: '保存', btnClose: '完成',
+    notePrefix: '备注 · ', notePlaceholder: '记点什么,比如这客人超好 / 明年小心...', btnDeleteNote: '删除备注',
+    taskNotePrefix: '任务备注 · ', taskNotePlaceholder: '记录这个任务的相关信息,比如在等文件、可以开始了...',
+    toastNeedClient: '先填客户名喵', toastNeedDesc: '先填任务描述喵', toastAdded: '已添加',
+    toastSaveFail: '保存失败,请重试', toastSaved: '已保存', toastNoteDeleted: '已删除备注',
+    toastExported: '已导出备份', toastImported: '已导入备份', toastImportFail: '导入失败,文件格式不对',
+    toastRestored: '已恢复到进行中', toastDeleted: '已删除', toastPersonExists: '这个人已经在列表里了',
+    undoMsg: '已完成并归档', undoBtn: '撤回',
+    tagNotStarted: '尚未开始 · 不用管', tagOverdue: '已过期', labelDue: '截止', labelCreated: '创建于',
+    labelLinkedShort: '关联:', btnPending: '未完成', btnNotStarted: '未开始',
+    emptyActive: '还没有任务,点右下角 + 添加一个客户任务喵', emptyNoMatch: '没有匹配的客户', emptyArchive: '暂无历史记录',
+    labelCompleted: '完成于', btnRestore: '恢复', toastRestoreBlocked: '这个客户还有更新的完成记录,请先恢复最新的那条喵',
+    toastRestoreAmbiguous: '已恢复,但发现有多个同类型任务,请手动检查一下有没有重复喵',
+    personMe: '我', filterAll: '全部',
+    addPersonModalTitle: '新增负责人', placeholderPersonName: '输入名字',
+    manageStaffTitle: '管理负责人', emptyStaff: '还没有添加负责人',
+    footerCredit: '本软件由猫猫幻雪与Claude共同完成喵o( •w• )o',
+    updateAvailableTitle: '有新版本喵!', updateVersionLabel: '版本', updateLater: '稍后', updateReload: '立即更新',
+    updateBackupWarning: '强烈建议先导出一份备份,谨防意外', updateBackupBtn: '导出备份', updateBackedUp: '已备份 ✓',
+    updateRollbackLinkText: '如果新版本有问题,点此回到上一版本',
+    backupReminder: '距上次备份 {days} 天了,建议导出一份', backupReminderNever: '还没有导出过备份,建议现在导出一份',
+    deleteConfirmTitle: '删除任务', deleteConfirmBodyTpl: '确定要删除「{client} — {period}」吗?之后自动生成的后续任务也不会再出现了。',
+    btnDelete: '删除'
+  },
+  en: {
+    appTitle: 'Client Task Tracker', tabActive: 'Active', tabArchive: 'History',
+    searchActivePlaceholder: 'Search client name...', searchArchivePlaceholder: 'Search client / task...',
+    sortTime: 'By time', sortClient: 'By client',
+    modalAddTitle: 'New Task', labelClient: 'Client name', placeholderClient: 'e.g. ABC Pty Ltd',
+    labelLinked: 'Linked client', labelLinkedName: 'Linked client name', placeholderLinkedName: 'e.g. ABC Holdings Pty Ltd',
+    labelType: 'Task type', typeBAS: 'BAS (Quarterly)', typeReturn: 'Return (Annual)', typeOther: 'Other',
+    labelQuarter: 'Select quarter', qPrev: 'Last quarter', qCurrent: 'This quarter', qNext: 'Next quarter',
+    labelFY: 'Select financial year', fyTo: 'to', fyErrorMsg: 'That spans more than one financial year', toastNeedFY: 'Please fill in both financial years',
+    labelOtherDesc: 'Task description', placeholderOtherDesc: 'e.g. Apply for ABN / Write minutes / Return a call',
+    labelWho: 'Assignee', btnCancel: 'Cancel', btnAdd: 'Add', btnSave: 'Save', btnClose: 'Done',
+    notePrefix: 'Note · ', notePlaceholder: 'Write anything, e.g. great client / be careful next year...', btnDeleteNote: 'Delete note',
+    taskNotePrefix: 'Task note · ', taskNotePlaceholder: 'Notes for this task, e.g. waiting on documents, ready to start...',
+    toastNeedClient: 'Enter a client name first', toastNeedDesc: 'Enter a task description first', toastAdded: 'Added',
+    toastSaveFail: 'Save failed, please retry', toastSaved: 'Saved', toastNoteDeleted: 'Note deleted',
+    toastExported: 'Backup exported', toastImported: 'Backup imported', toastImportFail: 'Import failed, invalid file',
+    toastRestored: 'Restored to active', toastDeleted: 'Deleted', toastPersonExists: 'That person is already in the list',
+    undoMsg: 'Completed & archived', undoBtn: 'Undo',
+    tagNotStarted: 'Not started yet', tagOverdue: 'Overdue', labelDue: 'Due', labelCreated: 'Created',
+    labelLinkedShort: 'Linked:', btnPending: 'Mark done', btnNotStarted: 'Not started',
+    emptyActive: 'No tasks yet — tap + to add one', emptyNoMatch: 'No matching clients', emptyArchive: 'No history yet',
+    labelCompleted: 'Completed', btnRestore: 'Restore', toastRestoreBlocked: 'There\'s a more recent completion for this client — restore that one first',
+    toastRestoreAmbiguous: 'Restored, but found multiple tasks of the same type — please check for duplicates manually',
+    personMe: 'Me', filterAll: 'All',
+    addPersonModalTitle: 'Add assignee', placeholderPersonName: 'Enter a name',
+    manageStaffTitle: 'Manage assignees', emptyStaff: 'No assignees added yet',
+    footerCredit: 'Built by huanxue the cat & Claude o( •w• )o',
+    updateAvailableTitle: 'New version available!', updateVersionLabel: 'Version', updateLater: 'Later', updateReload: 'Update now',
+    updateBackupWarning: 'Strongly recommended: export a backup first, just in case', updateBackupBtn: 'Export backup', updateBackedUp: 'Backed up ✓',
+    updateRollbackLinkText: 'If the new version has issues, click here to go back to the previous one',
+    backupReminder: "It's been {days} days since your last backup — worth exporting one", backupReminderNever: "You haven't exported a backup yet — worth doing one now",
+    deleteConfirmTitle: 'Delete task', deleteConfirmBodyTpl: 'Delete "{client} — {period}"? Any future auto-generated follow-up tasks will also stop appearing.',
+    btnDelete: 'Delete'
+  }
+};
+function tr(key){ return (I18N[currentLang] && I18N[currentLang][key]) || key; }
+function personLabel(name){ return name === '我' ? tr('personMe') : name; }
+function checkBackupReminder(){
+  const bar = document.getElementById('backupReminderBar');
+  if (tasks.length === 0 && archive.length === 0){ bar.style.display = 'none'; return; }
+  let lastExport = null;
+  try { lastExport = localStorage.getItem(LAST_EXPORT_KEY); } catch(e){}
+  if (!lastExport){
+    bar.textContent = tr('backupReminderNever');
+    bar.style.display = '';
+    return;
+  }
+  const days = Math.floor((Date.now() - Number(lastExport)) / 86400000);
+  if (days >= 7){
+    bar.textContent = tr('backupReminder').replace('{days}', days);
+    bar.style.display = '';
+  } else {
+    bar.style.display = 'none';
+  }
+}
+function translatePage(){
+  document.getElementById('pageTitle').textContent = tr('appTitle');
+  document.querySelectorAll('[data-i18n]').forEach(el => { el.textContent = tr(el.getAttribute('data-i18n')); });
+  document.querySelectorAll('[data-i18n-placeholder]').forEach(el => { el.placeholder = tr(el.getAttribute('data-i18n-placeholder')); });
+  document.getElementById('langToggleBtn').textContent = currentLang === 'zh' ? 'EN' : '中文';
+  renderWhoFilterChips();
+  checkBackupReminder();
+}
+
+// ---------- date / period helpers ----------
+function pad2(n){ return n<10 ? '0'+n : ''+n; }
+function fmt(d){ return d.getFullYear()+'-'+pad2(d.getMonth()+1)+'-'+pad2(d.getDate()); }
+function shortY(y){ return (''+y).slice(-2); }
+function shiftMonths(d, delta){ const nd = new Date(d); nd.setMonth(nd.getMonth()+delta); return nd; }
+// Re-parsing a bare "YYYY-MM-DD" string with `new Date(str)` is interpreted as UTC midnight
+// per spec, which drifts by several hours from true local midnight in non-UTC timezones.
+// This constructs the date using local-time components instead, so day-boundary checks
+// (self-check, overdue) line up with the user's actual local calendar day.
+function parseLocalDate(s){ if (!s) return null; const [y,m,d] = s.split('-').map(Number); return new Date(y, m-1, d); }
+function calendarQuarterStart(d){ const qStartMonth = Math.floor(d.getMonth()/3)*3; return new Date(d.getFullYear(), qStartMonth, 1); }
+function quarterFromStart(qStart){
+  const m = qStart.getMonth()+1; const y = qStart.getFullYear();
+  if (m===1) return { label:`Jan-Mar${shortY(y)}`,  workStart:new Date(y,3,1),  due:new Date(y,4,28) };
+  if (m===4) return { label:`Apr-Jun${shortY(y)}`,  workStart:new Date(y,6,1),  due:new Date(y,7,28) };
+  if (m===7) return { label:`Jul-Sep${shortY(y)}`,  workStart:new Date(y,9,1),  due:new Date(y,10,28) };
+  return          { label:`Oct-Dec${shortY(y)}`,  workStart:new Date(y+1,0,1), due:new Date(y+1,1,28) };
+}
+function currentFYStartYear(now){ const m = now.getMonth()+1; const y = now.getFullYear(); return (m>=7) ? y : y-1; }
+function returnFieldsFromFYStart(fy){ const workStart = new Date(fy+1, 6, 1); return { label: `FY${shortY(fy)}-${shortY(fy+1)}`, workStart }; }
+function normalizeYear(v){ return v < 100 ? 2000 + v : v; }
+function computeNewTaskPeriod(type, now, quarterOffset){
+  if (type === 'BAS'){
+    const qStart = shiftMonths(calendarQuarterStart(now), (quarterOffset||0)*3);
+    const q = quarterFromStart(qStart);
+    const started = now >= q.workStart;
+    return { period: q.label, qStart: fmt(qStart), due: fmt(q.due), workStart: fmt(q.workStart), status: started ? 'pending' : 'not_started' };
+  }
+  if (type === 'Return'){
+    const fy = currentFYStartYear(now) - 1;
+    const r = returnFieldsFromFYStart(fy);
+    const started = now >= r.workStart;
+    return { period: r.label, fyStartYear: fy, due: null, workStart: fmt(r.workStart), status: started ? 'pending' : 'not_started' };
+  }
+  return { period: null, due: null, workStart: null, status: 'pending' };
+}
+function genChainId(){ return 'c'+Date.now()+Math.random().toString(36).slice(2,8); }
+function buildNextTask(t, now){
+  if (t.type === 'Other') return null;
+  // Inherit the parent's chain id so restore-matching stays name-collision-proof even
+  // with duplicate client names (e.g. multiple family trusts). Legacy tasks created before
+  // this existed have no chainId - mint one now so the chain becomes trackable going forward.
+  const chainId = t.chainId || genChainId();
+  const base = { id: 't'+Date.now()+Math.random().toString(36).slice(2,7), chainId, client: t.client, type: t.type, who: t.who, linkedClient: t.linkedClient || null, note: '', createdAt: fmt(now), completedAt: null };
+  if (t.type === 'BAS'){
+    const nextQStart = shiftMonths(parseLocalDate(t.qStart), 3);
+    const q = quarterFromStart(nextQStart);
+    const started = now >= q.workStart;
+    return { ...base, status: started ? 'pending' : 'not_started', period: q.label, qStart: fmt(nextQStart), due: fmt(q.due), workStart: fmt(q.workStart) };
+  }
+  const nextFY = (t.fyStartYear !== undefined ? t.fyStartYear : currentFYStartYear(now)-1) + 1;
+  const r = returnFieldsFromFYStart(nextFY);
+  const started = now >= r.workStart;
+  return { ...base, status: started ? 'pending' : 'not_started', period: r.label, fyStartYear: nextFY, due: null, workStart: fmt(r.workStart) };
+}
+
+// ---------- storage ----------
+async function storageGet(key){
+  if (typeof window.storage !== 'undefined'){ try { return await window.storage.get(key, false); } catch(e){} }
+  try { const v = localStorage.getItem(key); return v !== null ? { value: v } : null; } catch(e){ return null; }
+}
+async function storageSet(key, value){
+  if (typeof window.storage !== 'undefined'){ try { await window.storage.set(key, value, false); return true; } catch(e){} }
+  try { localStorage.setItem(key, value); return true; } catch(e){ return false; }
+}
+// ---------- data normalization (backfills missing fields on old saved data so future
+// UI/field changes never crash on load - old data is treated as possibly incomplete) ----------
+function normalizeTask(t){
+  t = t || {};
+  return {
+    id: t.id || ('t'+Date.now()+Math.random().toString(36).slice(2,7)),
+    chainId: t.chainId || null,
+    client: t.client || '',
+    type: (t.type === 'BAS' || t.type === 'Return' || t.type === 'Other') ? t.type : 'Other',
+    who: t.who || '我',
+    status: (t.status === 'not_started') ? 'not_started' : 'pending',
+    period: t.period || null,
+    due: t.due || null,
+    workStart: t.workStart || null,
+    qStart: t.qStart,
+    fyStartYear: t.fyStartYear,
+    linkedClient: t.linkedClient || null,
+    note: t.note || '',
+    workStatus: t.workStatus || '',
+    createdAt: t.createdAt || fmt(new Date()),
+    completedAt: t.completedAt || null
+  };
+}
+function normalizeArchiveEntry(a){
+  a = a || {};
+  return {
+    id: a.id || ('a'+Date.now()+Math.random().toString(36).slice(2,7)),
+    chainId: a.chainId || null,
+    client: a.client || '', type: a.type || 'Other', period: a.period || '', who: a.who || '我',
+    createdAt: a.createdAt || null, completedAt: a.completedAt || null, archivedAt: a.archivedAt || fmt(new Date()),
+    qStart: a.qStart || null, fyStartYear: (a.fyStartYear !== undefined ? a.fyStartYear : null),
+    due: a.due || null, workStart: a.workStart || null, linkedClient: a.linkedClient || null, note: a.note || ''
+  };
+}
+
+async function loadData(){
+  try { const t = await storageGet(STORAGE_KEY); tasks = t ? JSON.parse(t.value) : []; } catch(e){ tasks = []; }
+  try { const a = await storageGet(ARCHIVE_KEY); archive = a ? JSON.parse(a.value) : []; } catch(e){ archive = []; }
+  try { const n = await storageGet(NOTES_KEY); clientNotes = n ? JSON.parse(n.value) : {}; } catch(e){ clientNotes = {}; }
+  try { const s = await storageGet(STAFF_KEY); staffList = s ? JSON.parse(s.value) : []; } catch(e){ staffList = []; }
+  try { currentLang = localStorage.getItem(LANG_KEY) || 'en'; } catch(e){ currentLang = 'en'; }
+
+  let storedSchemaVersion = 1;
+  try { const sv = await storageGet(SCHEMA_KEY); storedSchemaVersion = sv ? parseInt(sv.value, 10) || 1 : 1; } catch(e){}
+  if (storedSchemaVersion < DATA_VERSION){
+    const migrated = migrateBundle({ tasks, archive, clientNotes, staffList }, storedSchemaVersion);
+    tasks = migrated.tasks; archive = migrated.archive; clientNotes = migrated.clientNotes; staffList = migrated.staffList;
+    await storageSet(SCHEMA_KEY, String(DATA_VERSION));
+    await saveTasks(); await saveArchive(); await saveNotes(); await saveStaffList();
+  }
+
+  tasks = tasks.map(normalizeTask);
+  archive = archive.map(normalizeArchiveEntry);
+}
+async function saveTasks(){ const ok = await storageSet(STORAGE_KEY, JSON.stringify(tasks)); if (!ok) showToast(tr('toastSaveFail')); }
+async function saveArchive(){ const ok = await storageSet(ARCHIVE_KEY, JSON.stringify(archive)); if (!ok) showToast(tr('toastSaveFail')); }
+async function saveNotes(){ const ok = await storageSet(NOTES_KEY, JSON.stringify(clientNotes)); if (!ok) showToast(tr('toastSaveFail')); }
+async function saveStaffList(){ const ok = await storageSet(STAFF_KEY, JSON.stringify(staffList)); if (!ok) showToast(tr('toastSaveFail')); }
+function saveLang(){ try { localStorage.setItem(LANG_KEY, currentLang); } catch(e){} }
+
+// ---------- self-check ----------
+function runSelfCheck(now){
+  let changed = false;
+  tasks.forEach(t => { if (t.status === 'not_started' && t.workStart && now >= parseLocalDate(t.workStart)){ t.status = 'pending'; changed = true; } });
+  if (changed) saveTasks();
+}
+
+// ---------- person chips ----------
+function allPeople(){ return ['我', ...staffList]; }
+function renderWhoFilterChips(){
+  const row = document.getElementById('whoFilterRow');
+  row.innerHTML = '';
+  const allChip = document.createElement('button');
+  allChip.className = 'chip' + (selectedWhoFilter === null ? ' sel' : '');
+  allChip.textContent = tr('filterAll');
+  allChip.addEventListener('click', () => { selectedWhoFilter = null; renderWhoFilterChips(); render(); });
+  row.appendChild(allChip);
+  allPeople().forEach(p => {
+    const chip = document.createElement('button');
+    chip.className = 'chip' + (selectedWhoFilter === p ? ' sel' : '');
+    chip.textContent = personLabel(p);
+    chip.addEventListener('click', () => { selectedWhoFilter = p; renderWhoFilterChips(); render(); });
+    row.appendChild(chip);
+  });
+  const manageChip = document.createElement('button');
+  manageChip.className = 'chip';
+  manageChip.textContent = '✎';
+  manageChip.title = tr('manageStaffTitle');
+  manageChip.addEventListener('click', () => {
+    renderStaffManageList();
+    document.getElementById('staffManageModalBackdrop').classList.add('open');
+  });
+  row.appendChild(manageChip);
+}
+function renderStaffManageList(){
+  const el = document.getElementById('staffManageList');
+  if (staffList.length === 0){ el.innerHTML = `<div class="empty">${tr('emptyStaff')}</div>`; return; }
+  el.innerHTML = staffList.map(p => `
+    <div class="archive-row">
+      <div>${escapeHtml(p)}</div>
+      <button class="restore-btn" data-name="${escapeHtml(p)}" style="color:var(--danger);border-color:var(--danger-bg);">${tr('btnDelete')}</button>
+    </div>
+  `).join('');
+  el.querySelectorAll('button[data-name]').forEach(btn => btn.addEventListener('click', () => removeStaff(btn.dataset.name)));
+}
+async function removeStaff(name){
+  staffList = staffList.filter(p => p !== name);
+  await saveStaffList();
+  if (selectedWhoFilter === name) selectedWhoFilter = null;
+  renderStaffManageList();
+  renderWhoFilterChips();
+  render();
+}
+document.getElementById('staffManageCloseBtn').addEventListener('click', () => document.getElementById('staffManageModalBackdrop').classList.remove('open'));
+document.getElementById('staffManageModalBackdrop').addEventListener('click', (e) => { if (e.target.id === 'staffManageModalBackdrop') e.target.classList.remove('open'); });
+let newWho = '我';
+function renderWhoModalChips(){
+  const row = document.getElementById('f-who-chips');
+  row.innerHTML = '';
+  allPeople().forEach(p => {
+    const chip = document.createElement('button');
+    chip.type = 'button';
+    chip.className = 'chip' + (newWho === p ? ' sel' : '');
+    chip.textContent = personLabel(p);
+    chip.addEventListener('click', () => { newWho = p; renderWhoModalChips(); });
+    row.appendChild(chip);
+  });
+  const addChip = document.createElement('button');
+  addChip.type = 'button';
+  addChip.className = 'chip add-chip';
+  addChip.textContent = '+';
+  addChip.addEventListener('click', openAddPersonModal);
+  row.appendChild(addChip);
+}
+function openAddPersonModal(){
+  document.getElementById('newPersonName').value = '';
+  document.getElementById('addPersonModalBackdrop').classList.add('open');
+}
+document.getElementById('addPersonCancelBtn').addEventListener('click', () => document.getElementById('addPersonModalBackdrop').classList.remove('open'));
+document.getElementById('addPersonSaveBtn').addEventListener('click', async () => {
+  const name = document.getElementById('newPersonName').value.trim();
+  if (!name){ showToast(tr('toastNeedClient')); return; }
+  if (allPeople().includes(name)){ showToast(tr('toastPersonExists')); return; }
+  staffList.push(name);
+  await saveStaffList();
+  newWho = name;
+  renderWhoModalChips();
+  renderWhoFilterChips();
+  document.getElementById('addPersonModalBackdrop').classList.remove('open');
+});
+document.getElementById('addPersonModalBackdrop').addEventListener('click', (e) => { if (e.target.id === 'addPersonModalBackdrop') e.target.classList.remove('open'); });
+
+// ---------- rendering ----------
+const typeOrder = ['BAS','Return','Other'];
+function typeLabel(type){ return type==='BAS' ? tr('typeBAS').split('(')[0].trim() : type==='Return' ? tr('typeReturn').split('(')[0].trim() : tr('typeOther'); }
+
+function render(){
+  const now = new Date();
+  document.getElementById('todayLabel').textContent = now.toLocaleDateString(currentLang==='zh' ? 'zh-CN' : 'en-AU', {year:'numeric',month:'short',day:'numeric'});
+  const container = document.getElementById('activeView');
+  container.innerHTML = '';
+
+  const q = (document.getElementById('activeSearch').value || '').trim().toLowerCase();
+  const visibleTasks = tasks.filter(t =>
+    (!q || t.client.toLowerCase().includes(q) || (t.linkedClient||'').toLowerCase().includes(q)) &&
+    (selectedWhoFilter === null || t.who === selectedWhoFilter)
+  );
+
+  if (visibleTasks.length === 0){
+    container.innerHTML = `<div class="empty">${tasks.length === 0 ? tr('emptyActive') : tr('emptyNoMatch')}</div>`;
+    return;
+  }
+
+  typeOrder.forEach(type => {
+    const group = visibleTasks.filter(t => t.type === type);
+    if (group.length === 0) return;
+    const label = document.createElement('div');
+    label.className = 'section-label';
+    label.textContent = typeLabel(type);
+    container.appendChild(label);
+
+    group.forEach(t => {
+     try {
+      const notStarted = t.status === 'not_started';
+      const overdue = !notStarted && t.due && t.status==='pending' && parseLocalDate(t.due) < now;
+      const hasClientNote = clientNotes[t.client] && clientNotes[t.client].trim();
+      const taskNoteFirstLine = (t.note || '').split('\n')[0];
+      const periodText = t.period || '';
+      const row = document.createElement('div');
+      row.className = 'task-row';
+      const delBtn = document.createElement('button');
+      delBtn.className = 'del-btn-outside';
+      delBtn.dataset.id = t.id;
+      delBtn.title = 'delete';
+      delBtn.textContent = '🗑';
+      delBtn.addEventListener('click', (e) => { e.stopPropagation(); openDeleteConfirm(t.id); });
+      const card = document.createElement('div');
+      card.className = 'card' + (overdue ? ' overdue' : '') + (notStarted ? ' not-started' : '');
+      card.innerHTML = `
+        <div class="main">
+          <div class="client-row">
+            <span class="client" data-client="${escapeHtml(t.client)}">${escapeHtml(t.client)}${hasClientNote ? '<span class="note-dot" title="note"></span>' : ''}</span>
+            ${taskNoteFirstLine ? `<span class="task-note-preview">${escapeHtml(taskNoteFirstLine)}</span>` : ''}
+          </div>
+          ${t.linkedClient ? `<div class="linked-tag">${tr('labelLinkedShort')} ${escapeHtml(t.linkedClient)}</div>` : ''}
+          <div class="meta">
+            <span class="type-badge type-${t.type}">${typeLabel(t.type)}</span>
+            ${periodText ? `<span class="period">${escapeHtml(periodText)}</span>` : ''}
+            <span class="who">${escapeHtml(personLabel(t.who))}</span>
+            ${notStarted ? `<span class="ns-tag">${tr('tagNotStarted')}</span>` :
+              overdue ? `<span class="due-tag">${tr('tagOverdue')}</span>` : (t.due ? `<span class="period">${tr('labelDue')} ${t.due}</span>` : '')}
+            <span class="created-tag">${tr('labelCreated')} ${t.createdAt||'—'}</span>
+          </div>
+        </div>
+        <div class="btn-group">
+          <select class="status-select" data-id="${t.id}" ${notStarted ? 'disabled' : ''}>
+            <option value="">—</option>
+            <option value="READY" ${t.workStatus==='READY'?'selected':''}>READY</option>
+            <option value="Need Email" ${t.workStatus==='Need Email'?'selected':''}>Need Email</option>
+            <option value="On Review" ${t.workStatus==='On Review'?'selected':''}>On Review</option>
+            <option value="Wait on Client" ${t.workStatus==='Wait on Client'?'selected':''}>Wait on Client</option>
+          </select>
+          <button class="done-btn ${t.status}" data-id="${t.id}" ${notStarted ? 'disabled' : ''}>${notStarted ? tr('btnNotStarted') : tr('btnPending')}</button>
+        </div>
+      `;
+      card.addEventListener('click', (e) => {
+        if (e.target.closest('.done-btn')) return;
+        if (e.target.closest('.status-select')) return;
+        if (e.target.closest('.client[data-client]')) return;
+        openTaskNoteModal(t.id);
+      });
+      row.appendChild(delBtn);
+      row.appendChild(card);
+      container.appendChild(row);
+     } catch(cardErr){
+      console.warn('Skipped a task that failed to render:', t && t.id, cardErr);
+     }
+    });
+  });
+
+  container.querySelectorAll('.done-btn:not([disabled])').forEach(btn => {
+    btn.addEventListener('click', (e) => { e.stopPropagation(); completeTask(btn.dataset.id); });
+  });
+  container.querySelectorAll('.status-select').forEach(sel => {
+    sel.addEventListener('click', (e) => e.stopPropagation());
+    sel.addEventListener('change', async (e) => {
+      e.stopPropagation();
+      const task = tasks.find(x => x.id === sel.dataset.id); if (!task) return;
+      task.workStatus = sel.value;
+      await saveTasks();
+    });
+  });
+  container.querySelectorAll('.client[data-client]').forEach(el => {
+    el.addEventListener('click', (e) => { e.stopPropagation(); openNoteModal(el.dataset.client); });
+  });
+}
+
+// ---------- delete (with confirm) ----------
+let deleteEditingId = null;
+function openDeleteConfirm(id){
+  const t = tasks.find(x => x.id === id); if (!t) return;
+  deleteEditingId = id;
+  const label = t.period || typeLabel(t.type);
+  document.getElementById('deleteConfirmBody').textContent = tr('deleteConfirmBodyTpl').replace('{client}', t.client).replace('{period}', label);
+  document.getElementById('deleteConfirmModalBackdrop').classList.add('open');
+}
+document.getElementById('deleteCancelBtn').addEventListener('click', () => document.getElementById('deleteConfirmModalBackdrop').classList.remove('open'));
+document.getElementById('deleteConfirmBtn').addEventListener('click', async () => {
+  if (!deleteEditingId) return;
+  const idx = tasks.findIndex(x => x.id === deleteEditingId);
+  if (idx >= 0) tasks.splice(idx, 1);
+  await saveTasks();
+  document.getElementById('deleteConfirmModalBackdrop').classList.remove('open');
+  render();
+  showToast(tr('toastDeleted'));
+  deleteEditingId = null;
+});
+document.getElementById('deleteConfirmModalBackdrop').addEventListener('click', (e) => { if (e.target.id === 'deleteConfirmModalBackdrop') e.target.classList.remove('open'); });
+
+// ---------- complete -> archive + spawn next task, with 5s undo ----------
+function completeTask(id){
+  const idx = tasks.findIndex(x => x.id === id);
+  if (idx < 0) return;
+  const t = tasks[idx];
+  const now = new Date();
+  const archEntry = {
+    id: 'a'+Date.now()+Math.random().toString(36).slice(2,7),
+    chainId: t.chainId || null,
+    client: t.client, type: t.type, period: t.period || '', who: t.who,
+    createdAt: t.createdAt || null, completedAt: fmt(now), archivedAt: fmt(now),
+    qStart: t.qStart || null, fyStartYear: (t.fyStartYear !== undefined ? t.fyStartYear : null),
+    due: t.due || null, workStart: t.workStart || null, linkedClient: t.linkedClient || null, note: t.note || ''
+  };
+  archive.push(archEntry);
+  tasks.splice(idx, 1);
+  const nextTask = buildNextTask(t, now);
+  if (nextTask) tasks.push(nextTask);
+  saveTasks(); saveArchive(); render();
+  lastAction = { archEntry, nextTaskId: nextTask ? nextTask.id : null, originalTask: t };
+  showUndo();
+}
+function undoLastComplete(){
+  if (!lastAction) return;
+  if (lastAction.nextTaskId){ const i = tasks.findIndex(x => x.id === lastAction.nextTaskId); if (i >= 0) tasks.splice(i, 1); }
+  const ai = archive.findIndex(a => a.id === lastAction.archEntry.id);
+  if (ai >= 0) archive.splice(ai, 1);
+  tasks.push(lastAction.originalTask);
+  saveTasks(); saveArchive(); render(); hideUndo();
+  lastAction = null;
+}
+function showUndo(){
+  const bar = document.getElementById('undoBar');
+  bar.classList.add('show');
+  clearTimeout(undoTimeout);
+  undoTimeout = setTimeout(() => { bar.classList.remove('show'); lastAction = null; }, 5000);
+}
+function hideUndo(){ document.getElementById('undoBar').classList.remove('show'); clearTimeout(undoTimeout); }
+document.getElementById('undoBtn').addEventListener('click', undoLastComplete);
+
+// ---------- restore from archive ----------
+// For chained types (BAS/Return), only the most recently completed entry for a given
+// client+type may be restored - earlier ones must wait until the more recent one is
+// restored first. This sidesteps fragile id-chasing entirely: archive entries are pushed
+// in chronological order, so "most recent" is just "last matching entry in the array",
+// which stays cheap and correct however many completed tasks pile up.
+// Two records belong to the same recurring lineage if they share a chainId (the robust,
+// name-collision-proof case for anything created after this feature shipped). Older records
+// from before chainId existed fall back to client+type matching - less precise, but only
+// for historical data; every chain becomes chainId-tracked from its next completion onward.
+function sameChain(a, x){
+  if (a.chainId && x.chainId) return a.chainId === x.chainId;
+  return a.client === x.client && a.type === x.type;
+}
+function isTipArchiveEntry(a){
+  if (a.type === 'Other') return true; // ad-hoc tasks don't chain, always restorable
+  let lastMatchIdx = -1;
+  archive.forEach((x, i) => { if (sameChain(a, x)) lastMatchIdx = i; });
+  return archive.indexOf(a) === lastMatchIdx;
+}
+
+function restoreFromArchive(id){
+  const idx = archive.findIndex(a => a.id === id);
+  if (idx < 0) return;
+  const a = archive[idx];
+  if (!isTipArchiveEntry(a)){
+    showToast(tr('toastRestoreBlocked'));
+    return;
+  }
+  archive.splice(idx, 1);
+  // Remove whatever active task currently sits at this client+type (the successor this
+  // completion spawned, directly or via a longer chain) so restoring doesn't leave a duplicate.
+  // If there's more than one match (e.g. a manually-added duplicate task for the same
+  // client+type), don't guess which one to remove - leave both and flag it for a manual check.
+  let ambiguousMatch = false;
+  if (a.type !== 'Other'){
+    const matches = tasks.filter(x => sameChain(a, x));
+    if (matches.length === 1){
+      const ni = tasks.findIndex(x => sameChain(a, x));
+      tasks.splice(ni, 1);
+    } else if (matches.length > 1){
+      ambiguousMatch = true;
+    }
+  }
+  tasks.push({
+    id: 't'+Date.now()+Math.random().toString(36).slice(2,7),
+    chainId: a.chainId || null,
+    client: a.client, type: a.type, who: a.who, status: 'pending',
+    period: a.period || null, due: a.due || null, workStart: a.workStart || null,
+    qStart: a.qStart || undefined, fyStartYear: (a.fyStartYear !== null && a.fyStartYear !== undefined ? a.fyStartYear : undefined),
+    linkedClient: a.linkedClient || null, note: a.note || '',
+    createdAt: a.createdAt || fmt(new Date()), completedAt: null
+  });
+  saveTasks(); saveArchive(); render();
+  renderArchive(document.getElementById('archiveSearch').value);
+  showToast(ambiguousMatch ? tr('toastRestoreAmbiguous') : tr('toastRestored'));
+}
+
+function renderArchive(filter){
+  const list = document.getElementById('archiveList');
+  const f = (filter||'').trim().toLowerCase();
+  const rows = archive.filter(a => !f || a.client.toLowerCase().includes(f) || (a.period||'').toLowerCase().includes(f));
+  if (rows.length === 0){ list.innerHTML = `<div class="empty">${tr('emptyArchive')}</div>`; return; }
+  if (archiveSortMode === 'time'){
+    rows.sort((a,b) => (b.archivedAt||'').localeCompare(a.archivedAt||''));
+    list.innerHTML = rows.map(rowHtml).join('');
+  } else {
+    const byClient = {};
+    rows.forEach(a => { (byClient[a.client] = byClient[a.client] || []).push(a); });
+    const clients = Object.keys(byClient).sort((a,b) => a.localeCompare(b, 'zh'));
+    list.innerHTML = clients.map(c => {
+      const items = byClient[c].sort((a,b) => (b.archivedAt||'').localeCompare(a.archivedAt||''));
+      return `<div class="archive-group-label">${escapeHtml(c)}</div>` + items.map(rowHtml).join('');
+    }).join('');
+  }
+  list.querySelectorAll('.restore-btn').forEach(btn => btn.addEventListener('click', () => restoreFromArchive(btn.dataset.id)));
+}
+function rowHtml(a){
+  const tip = isTipArchiveEntry(a);
+  return `
+    <div class="archive-row">
+      <div><span class="type-badge type-${a.type}">${typeLabel(a.type)}</span>&nbsp;<strong>${escapeHtml(a.client)}</strong>${a.period ? ' — ' + escapeHtml(a.period) : ''}</div>
+      <div class="ac-right">
+        <div class="ac-date">${tr('labelCompleted')} ${a.completedAt || '—'}</div>
+        <button class="restore-btn" data-id="${a.id}" ${tip ? '' : 'disabled'} style="${tip ? '' : 'opacity:0.4;cursor:default;'}" title="${tip ? '' : escapeHtml(tr('toastRestoreBlocked'))}">${tr('btnRestore')}</button>
+      </div>
+    </div>
+  `;
+}
+
+function escapeHtml(s){ return (s||'').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function showToast(msg){ const el = document.getElementById('toast'); el.textContent = msg; el.classList.add('show'); setTimeout(()=>el.classList.remove('show'), 1800); }
+
+// ---------- client notes ----------
+let noteEditingClient = null;
+function openNoteModal(client){
+  noteEditingClient = client;
+  document.getElementById('noteModalTitle').textContent = `${tr('notePrefix')}${client}`;
+  document.getElementById('noteText').value = clientNotes[client] || '';
+  document.getElementById('noteModalBackdrop').classList.add('open');
+}
+document.getElementById('noteSaveBtn').addEventListener('click', async () => {
+  if (!noteEditingClient) return;
+  const val = document.getElementById('noteText').value.trim();
+  if (val) clientNotes[noteEditingClient] = val; else delete clientNotes[noteEditingClient];
+  await saveNotes();
+  document.getElementById('noteModalBackdrop').classList.remove('open');
+  render(); showToast(tr('toastSaved'));
+});
+document.getElementById('noteDeleteBtn').addEventListener('click', async () => {
+  if (!noteEditingClient) return;
+  delete clientNotes[noteEditingClient];
+  await saveNotes();
+  document.getElementById('noteModalBackdrop').classList.remove('open');
+  render(); showToast(tr('toastNoteDeleted'));
+});
+document.getElementById('noteModalBackdrop').addEventListener('click', (e) => { if (e.target.id === 'noteModalBackdrop') e.target.classList.remove('open'); });
+
+// ---------- task notes ----------
+let taskNoteEditingId = null;
+function openTaskNoteModal(id){
+  const task = tasks.find(x => x.id === id); if (!task) return;
+  taskNoteEditingId = id;
+  document.getElementById('taskNoteModalTitle').textContent = `${tr('taskNotePrefix')}${task.client} · ${task.period || typeLabel(task.type)}`;
+  document.getElementById('taskNoteText').value = task.note || '';
+  document.getElementById('taskNoteModalBackdrop').classList.add('open');
+}
+document.getElementById('taskNoteSaveBtn').addEventListener('click', async () => {
+  const task = tasks.find(x => x.id === taskNoteEditingId); if (!task) return;
+  const val = document.getElementById('taskNoteText').value;
+  task.note = val.trim() ? val : '';
+  await saveTasks();
+  document.getElementById('taskNoteModalBackdrop').classList.remove('open');
+  render(); showToast(tr('toastSaved'));
+});
+document.getElementById('taskNoteDeleteBtn').addEventListener('click', async () => {
+  const task = tasks.find(x => x.id === taskNoteEditingId); if (!task) return;
+  task.note = '';
+  await saveTasks();
+  document.getElementById('taskNoteModalBackdrop').classList.remove('open');
+  render(); showToast(tr('toastNoteDeleted'));
+});
+document.getElementById('taskNoteModalBackdrop').addEventListener('click', (e) => { if (e.target.id === 'taskNoteModalBackdrop') e.target.classList.remove('open'); });
+
+// ---------- header: language + export/import ----------
+document.getElementById('langToggleBtn').addEventListener('click', () => {
+  currentLang = currentLang === 'zh' ? 'en' : 'zh';
+  saveLang();
+  translatePage();
+  render();
+  renderArchive(document.getElementById('archiveSearch').value);
+});
+function exportBackup(){
+  const payload = JSON.stringify({ dataVersion: DATA_VERSION, tasks, archive, clientNotes, staffList, exportedAt: fmt(new Date()) }, null, 2);
+  const blob = new Blob([payload], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = `client-task-tracker-backup-${fmt(new Date())}.json`;
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+  try { localStorage.setItem(LAST_EXPORT_KEY, String(Date.now())); } catch(e){}
+  checkBackupReminder();
+}
+document.getElementById('exportBtn').addEventListener('click', () => { exportBackup(); showToast(tr('toastExported')); });
+document.getElementById('importBtn').addEventListener('click', () => document.getElementById('importFile').click());
+document.getElementById('importFile').addEventListener('change', (e) => {
+  const file = e.target.files[0]; if (!file) return;
+  const reader = new FileReader();
+  reader.onload = async () => {
+    try {
+      const data = JSON.parse(reader.result);
+      const importedVersion = data.dataVersion || 1;
+      const migrated = migrateBundle({
+        tasks: data.tasks || [], archive: data.archive || [],
+        clientNotes: data.clientNotes || {}, staffList: data.staffList || staffList
+      }, importedVersion);
+      tasks = migrated.tasks.map(normalizeTask);
+      archive = migrated.archive.map(normalizeArchiveEntry);
+      clientNotes = migrated.clientNotes;
+      staffList = migrated.staffList;
+      await storageSet(SCHEMA_KEY, String(DATA_VERSION));
+      await saveTasks(); await saveArchive(); await saveNotes(); await saveStaffList();
+      renderWhoFilterChips(); render(); renderArchive(document.getElementById('archiveSearch').value);
+      showToast(tr('toastImported'));
+    } catch(err){ showToast(tr('toastImportFail')); }
+    e.target.value = '';
+  };
+  reader.readAsText(file);
+});
+
+// ---------- add task modal ----------
+let newType = 'BAS';
+let newQuarterOffset = 0;
+function updateFieldVisibility(){
+  document.getElementById('f-quarter-wrap').style.display = (newType === 'BAS') ? '' : 'none';
+  document.getElementById('f-other-wrap').style.display = (newType === 'Other') ? '' : 'none';
+  document.getElementById('f-fy-wrap').style.display = (newType === 'Return') ? '' : 'none';
+  document.getElementById('fyError').style.display = 'none';
+  if (newType === 'Return'){
+    const fy = currentFYStartYear(new Date()) - 1;
+    document.getElementById('f-fy-start').value = shortY(fy);
+    document.getElementById('f-fy-end').value = shortY(fy+1);
+  }
+}
+document.getElementById('addBtn').addEventListener('click', () => {
+  document.getElementById('f-client').value = '';
+  document.getElementById('f-other-desc').value = '';
+  document.getElementById('f-linked-check').checked = false;
+  document.getElementById('f-linked-name').value = '';
+  document.getElementById('f-linked-wrap').style.display = 'none';
+  newType = 'BAS'; newQuarterOffset = 0; newWho = '我';
+  [...document.getElementById('f-type').children].forEach(b => b.classList.toggle('sel', b.dataset.v==='BAS'));
+  [...document.getElementById('f-quarter').children].forEach(b => b.classList.toggle('sel', b.dataset.v==='0'));
+  renderWhoModalChips();
+  updateFieldVisibility();
+  document.getElementById('modalBackdrop').classList.add('open');
+});
+document.getElementById('cancelBtn').addEventListener('click', () => document.getElementById('modalBackdrop').classList.remove('open'));
+document.getElementById('f-linked-check').addEventListener('change', (e) => { document.getElementById('f-linked-wrap').style.display = e.target.checked ? '' : 'none'; });
+document.getElementById('f-type').addEventListener('click', (e) => {
+  const btn = e.target.closest('button'); if (!btn) return;
+  newType = btn.dataset.v;
+  [...document.getElementById('f-type').children].forEach(b => b.classList.toggle('sel', b===btn));
+  updateFieldVisibility();
+});
+document.getElementById('f-quarter').addEventListener('click', (e) => {
+  const btn = e.target.closest('button'); if (!btn) return;
+  newQuarterOffset = parseInt(btn.dataset.v, 10);
+  [...document.getElementById('f-quarter').children].forEach(b => b.classList.toggle('sel', b===btn));
+});
+document.getElementById('saveBtn').addEventListener('click', async () => {
+  const client = document.getElementById('f-client').value.trim();
+  if (!client){ showToast(tr('toastNeedClient')); return; }
+  if (newType === 'Other' && !document.getElementById('f-other-desc').value.trim()){ showToast(tr('toastNeedDesc')); return; }
+
+  const now = new Date();
+  const fyErrorEl = document.getElementById('fyError');
+  fyErrorEl.style.display = 'none';
+  let p;
+  if (newType === 'Return'){
+    const startRaw = parseInt(document.getElementById('f-fy-start').value, 10);
+    const endRaw = parseInt(document.getElementById('f-fy-end').value, 10);
+    if (isNaN(startRaw) || isNaN(endRaw)){ showToast(tr('toastNeedFY')); return; }
+    const fyStart = normalizeYear(startRaw);
+    const fyEnd = normalizeYear(endRaw);
+    if (fyEnd - fyStart !== 1){
+      fyErrorEl.textContent = tr('fyErrorMsg');
+      fyErrorEl.style.display = '';
+      return;
+    }
+    const r = returnFieldsFromFYStart(fyStart);
+    const started = now >= r.workStart;
+    p = { period: r.label, fyStartYear: fyStart, due: null, workStart: fmt(r.workStart), status: started ? 'pending' : 'not_started' };
+  } else {
+    p = computeNewTaskPeriod(newType, now, newType==='BAS' ? newQuarterOffset : 0);
+  }
+
+  const linked = document.getElementById('f-linked-check').checked ? document.getElementById('f-linked-name').value.trim() : '';
+  const period = newType === 'Other' ? document.getElementById('f-other-desc').value.trim() : p.period;
+  tasks.push({
+    id: 't'+Date.now()+Math.random().toString(36).slice(2,7),
+    chainId: genChainId(),
+    client, type: newType, who: newWho, status: p.status,
+    period, due: p.due, workStart: p.workStart,
+    qStart: p.qStart, fyStartYear: p.fyStartYear,
+    linkedClient: linked || null, note: '',
+    createdAt: fmt(now), completedAt: null
+  });
+  await saveTasks();
+  document.getElementById('modalBackdrop').classList.remove('open');
+  render();
+  showToast(tr('toastAdded'));
+});
+document.getElementById('modalBackdrop').addEventListener('click', (e) => { if (e.target.id === 'modalBackdrop') e.target.classList.remove('open'); });
+
+// ---------- tabs ----------
+document.querySelectorAll('.tab').forEach(tab => {
+  tab.addEventListener('click', () => {
+    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+    tab.classList.add('active');
+    const which = tab.dataset.tab;
+    document.getElementById('activeSearchWrap').style.display = which==='active' ? '' : 'none';
+    document.getElementById('whoFilterRow').style.display = which==='active' ? '' : 'none';
+    document.getElementById('activeView').style.display = which==='active' ? '' : 'none';
+    document.getElementById('archiveView').style.display = which==='archive' ? '' : 'none';
+    if (which==='archive') renderArchive(document.getElementById('archiveSearch').value);
+  });
+});
+document.getElementById('archiveSearch').addEventListener('input', (e) => renderArchive(e.target.value));
+document.getElementById('activeSearch').addEventListener('input', render);
+document.getElementById('archiveSort').addEventListener('click', (e) => {
+  const btn = e.target.closest('button'); if (!btn) return;
+  archiveSortMode = btn.dataset.v;
+  [...document.getElementById('archiveSort').children].forEach(b => b.classList.toggle('sel', b===btn));
+  renderArchive(document.getElementById('archiveSearch').value);
+});
+
+// ---------- update check ----------
+async function checkForUpdate(){
+  if (!VERSION_CHECK_URL) return;
+  try {
+    const res = await fetch(VERSION_CHECK_URL + (VERSION_CHECK_URL.includes('?') ? '&' : '?') + 't=' + Date.now(), { cache: 'no-store' });
+    if (!res.ok) return;
+    const data = await res.json();
+    if (data && data.version && data.version !== APP_VERSION){
+      const notes = (currentLang === 'zh' ? data.notes_zh : data.notes_en) || data.notes_zh || data.notes_en || [];
+      document.getElementById('updateVersionText').textContent = data.version;
+      document.getElementById('updateNotesList').innerHTML = notes.map(n => `<li>${escapeHtml(n)}</li>`).join('');
+
+      // reset the backup gate every time a new update is shown
+      const reloadBtn = document.getElementById('updateReloadBtn');
+      const backupBtn = document.getElementById('updateBackupBtn');
+      reloadBtn.disabled = true;
+      reloadBtn.style.opacity = '0.5';
+      reloadBtn.style.cursor = 'default';
+      backupBtn.disabled = false;
+      backupBtn.textContent = tr('updateBackupBtn');
+
+      const rollbackWrap = document.getElementById('updateRollbackWrap');
+      if (data.previous_url){
+        document.getElementById('updateRollbackLink').href = data.previous_url;
+        rollbackWrap.style.display = '';
+      } else {
+        rollbackWrap.style.display = 'none';
+      }
+
+      document.getElementById('updateModalBackdrop').classList.add('open');
+    }
+  } catch(e) { /* offline or host unreachable - fail silently, this is a non-essential nicety */ }
+}
+document.getElementById('updateBackupBtn').addEventListener('click', () => {
+  exportBackup();
+  showToast(tr('toastExported'));
+  const reloadBtn = document.getElementById('updateReloadBtn');
+  reloadBtn.disabled = false;
+  reloadBtn.style.opacity = '1';
+  reloadBtn.style.cursor = 'pointer';
+  document.getElementById('updateBackupBtn').textContent = tr('updateBackedUp');
+});
+document.getElementById('updateDismissBtn').addEventListener('click', () => document.getElementById('updateModalBackdrop').classList.remove('open'));
+document.getElementById('updateReloadBtn').addEventListener('click', (e) => {
+  if (e.target.disabled) return;
+  location.reload();
+});
+document.getElementById('updateModalBackdrop').addEventListener('click', (e) => { if (e.target.id === 'updateModalBackdrop') e.target.classList.remove('open'); });
+
+// ---------- crash recovery: if anything above throws, never leave a blank page -
+// show a minimal standalone screen that still lets the person export their raw data ----------
+function showCrashScreen(err){
+  console.error('App crashed, showing recovery screen:', err);
+  try {
+    document.body.innerHTML = '';
+    const wrap = document.createElement('div');
+    wrap.style.cssText = 'max-width:440px;margin:70px auto;padding:0 20px;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;text-align:center;';
+    wrap.innerHTML = `
+      <h2 style="color:#b03a2e;font-size:18px;margin-bottom:8px;">出错了,但你的数据还在</h2>
+      <p style="color:#4a5568;font-size:13.5px;line-height:1.6;">界面这次加载失败了,不过存储的数据没有丢——先点下面按钮导出一份保存好,然后把这个情况反馈给开发者。</p>
+      <button id="crashExportBtn" style="background:#1c2733;color:#fff;border:none;border-radius:8px;padding:12px 22px;font-size:14px;font-weight:700;cursor:pointer;margin-top:14px;">导出数据 / Export data</button>
+    `;
+    document.body.appendChild(wrap);
+    document.getElementById('crashExportBtn').addEventListener('click', () => {
+      try { exportBackup(); } catch(e2){ alert('导出也失败了,请把这段信息反馈给开发者: ' + (e2 && e2.message)); }
+    });
+  } catch(e2){ /* if even the recovery screen fails, there's nothing more we can safely do client-side */ }
+}
+
+// ---------- init ----------
+(async function init(){
+  try {
+    await loadData();
+    runSelfCheck(new Date());
+    translatePage();
+    render();
+    checkForUpdate();
+  } catch(err){
+    showCrashScreen(err);
+  }
+})();
+</script>
+</body>
+</html>
