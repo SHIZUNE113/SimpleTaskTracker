@@ -176,10 +176,14 @@
     </div>
     <div class="field" id="f-quarter-wrap">
       <label data-i18n="labelQuarter">选择季度</label>
-      <div class="seg" id="f-quarter">
-        <button data-v="-1" data-i18n="qPrev">上季度</button>
-        <button data-v="0" class="sel" data-i18n="qCurrent">本季度</button>
-        <button data-v="1" data-i18n="qNext">下季度</button>
+      <div style="display:flex;align-items:center;gap:6px;">
+        <select id="f-quarter-select" style="flex:1;">
+          <option value="7" data-i18n="quarterQ1">Q1 Jul-Sep</option>
+          <option value="10" data-i18n="quarterQ2">Q2 Oct-Dec</option>
+          <option value="1" data-i18n="quarterQ3">Q3 Jan-Mar</option>
+          <option value="4" data-i18n="quarterQ4">Q4 Apr-Jun</option>
+        </select>
+        <input type="number" id="f-quarter-year" style="width:64px;" placeholder="26">
       </div>
     </div>
     <div class="field" id="f-fy-wrap" style="display:none;">
@@ -297,8 +301,8 @@ const LAST_EXPORT_KEY = 'last-export-at-v1';
 // Bump APP_VERSION on every release. Point VERSION_CHECK_URL at a version.json file hosted
 // alongside this html (e.g. on GitHub Pages) once you set that up - leave it blank to disable
 // the update-check entirely (the app works fine either way).
-const APP_VERSION = '1.0.0';
-const VERSION_CHECK_URL = '';
+const APP_VERSION = '1.1.0';
+const VERSION_CHECK_URL = 'https://shizune113.github.io/SimpleTaskTracker/version.json';
 
 // DATA_VERSION is separate from APP_VERSION: bump this only when the *shape* of saved data
 // changes (a field renamed/restructured - not just a new optional field added, since
@@ -343,6 +347,7 @@ const I18N = {
     labelLinked: '关联客户', labelLinkedName: '关联客户名', placeholderLinkedName: '例如 ABC Holdings Pty Ltd',
     labelType: '任务类型', typeBAS: 'BAS(季度)', typeReturn: 'Return(年度)', typeOther: '其他',
     labelQuarter: '选择季度', qPrev: '上季度', qCurrent: '本季度', qNext: '下季度',
+    quarterQ1: 'Q1 Jul-Sep', quarterQ2: 'Q2 Oct-Dec', quarterQ3: 'Q3 Jan-Mar', quarterQ4: 'Q4 Apr-Jun',
     labelFY: '选择财年', fyTo: 'to', fyErrorMsg: '填写内容大于一年喵', toastNeedFY: '请填写完整的财年喵',
     labelOtherDesc: '任务描述', placeholderOtherDesc: '例如 申请ABN / 做会议纪要 / 回电话',
     labelWho: '负责人', btnCancel: '取消', btnAdd: '添加', btnSave: '保存', btnClose: '完成',
@@ -377,6 +382,7 @@ const I18N = {
     labelLinked: 'Linked client', labelLinkedName: 'Linked client name', placeholderLinkedName: 'e.g. ABC Holdings Pty Ltd',
     labelType: 'Task type', typeBAS: 'BAS (Quarterly)', typeReturn: 'Return (Annual)', typeOther: 'Other',
     labelQuarter: 'Select quarter', qPrev: 'Last quarter', qCurrent: 'This quarter', qNext: 'Next quarter',
+    quarterQ1: 'Q1 Jul-Sep', quarterQ2: 'Q2 Oct-Dec', quarterQ3: 'Q3 Jan-Mar', quarterQ4: 'Q4 Apr-Jun',
     labelFY: 'Select financial year', fyTo: 'to', fyErrorMsg: 'That spans more than one financial year', toastNeedFY: 'Please fill in both financial years',
     labelOtherDesc: 'Task description', placeholderOtherDesc: 'e.g. Apply for ABN / Write minutes / Return a call',
     labelWho: 'Assignee', btnCancel: 'Cancel', btnAdd: 'Add', btnSave: 'Save', btnClose: 'Done',
@@ -1009,12 +1015,17 @@ document.getElementById('importFile').addEventListener('change', (e) => {
 
 // ---------- add task modal ----------
 let newType = 'BAS';
-let newQuarterOffset = 0;
 function updateFieldVisibility(){
   document.getElementById('f-quarter-wrap').style.display = (newType === 'BAS') ? '' : 'none';
   document.getElementById('f-other-wrap').style.display = (newType === 'Other') ? '' : 'none';
   document.getElementById('f-fy-wrap').style.display = (newType === 'Return') ? '' : 'none';
   document.getElementById('fyError').style.display = 'none';
+  if (newType === 'BAS'){
+    const now = new Date();
+    const qStart = calendarQuarterStart(now);
+    document.getElementById('f-quarter-select').value = String(qStart.getMonth() + 1);
+    document.getElementById('f-quarter-year').value = shortY(qStart.getFullYear());
+  }
   if (newType === 'Return'){
     const fy = currentFYStartYear(new Date()) - 1;
     document.getElementById('f-fy-start').value = shortY(fy);
@@ -1027,7 +1038,7 @@ document.getElementById('addBtn').addEventListener('click', () => {
   document.getElementById('f-linked-check').checked = false;
   document.getElementById('f-linked-name').value = '';
   document.getElementById('f-linked-wrap').style.display = 'none';
-  newType = 'BAS'; newQuarterOffset = 0; newWho = '我';
+  newType = 'BAS'; newWho = '我';
   [...document.getElementById('f-type').children].forEach(b => b.classList.toggle('sel', b.dataset.v==='BAS'));
   [...document.getElementById('f-quarter').children].forEach(b => b.classList.toggle('sel', b.dataset.v==='0'));
   renderWhoModalChips();
@@ -1041,11 +1052,6 @@ document.getElementById('f-type').addEventListener('click', (e) => {
   newType = btn.dataset.v;
   [...document.getElementById('f-type').children].forEach(b => b.classList.toggle('sel', b===btn));
   updateFieldVisibility();
-});
-document.getElementById('f-quarter').addEventListener('click', (e) => {
-  const btn = e.target.closest('button'); if (!btn) return;
-  newQuarterOffset = parseInt(btn.dataset.v, 10);
-  [...document.getElementById('f-quarter').children].forEach(b => b.classList.toggle('sel', b===btn));
 });
 document.getElementById('saveBtn').addEventListener('click', async () => {
   const client = document.getElementById('f-client').value.trim();
@@ -1070,8 +1076,16 @@ document.getElementById('saveBtn').addEventListener('click', async () => {
     const r = returnFieldsFromFYStart(fyStart);
     const started = now >= r.workStart;
     p = { period: r.label, fyStartYear: fyStart, due: null, workStart: fmt(r.workStart), status: started ? 'pending' : 'not_started' };
+  } else if (newType === 'BAS'){
+    const qMonth = parseInt(document.getElementById('f-quarter-select').value, 10);
+    const qYearRaw = parseInt(document.getElementById('f-quarter-year').value, 10);
+    if (isNaN(qYearRaw)){ showToast(tr('toastNeedFY')); return; }
+    const qStart = new Date(normalizeYear(qYearRaw), qMonth - 1, 1);
+    const q = quarterFromStart(qStart);
+    const started = now >= q.workStart;
+    p = { period: q.label, qStart: fmt(qStart), due: fmt(q.due), workStart: fmt(q.workStart), status: started ? 'pending' : 'not_started' };
   } else {
-    p = computeNewTaskPeriod(newType, now, newType==='BAS' ? newQuarterOffset : 0);
+    p = computeNewTaskPeriod(newType, now, 0);
   }
 
   const linked = document.getElementById('f-linked-check').checked ? document.getElementById('f-linked-name').value.trim() : '';
