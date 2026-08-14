@@ -1,12 +1,12 @@
 {
-  "version": "1.1.1",
+  "version": "1.1.2",
   "notes_zh": [
-    "🎯 新玩法:BAS建卡不用再看老天脸色——直接选Q几 + 填年份,想建哪年建哪年!",
-    "🌏 新人友好:同事第一次打开默认英文界面,不会被劝退喵"
+    "🛠️ 系统升级:更新提醒终于装上了真的记忆——以后版本一变,你和同事都会准时收到这种弹窗喵",
+    "🐛 修复:导出备份万一失败也不会再把人卡在弹窗里出不去了"
   ],
   "notes_en": [
-    "🎯 New: BAS task creation now lets you pick any quarter + year directly — no more waiting on the calendar!",
-    "🌏 QoL: First-time visitors now see English by default, so new teammates aren't dropped straight into Chinese"
+    "🛠️ Under the hood: update notifications now actually remember what you've seen — future bumps will reliably ping you and your teammates",
+    "🐛 Fixed: a failed backup export could no longer trap you inside the update popup"
   ],
   "previous_url": ""
 }
