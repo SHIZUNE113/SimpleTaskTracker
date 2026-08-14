@@ -300,11 +300,13 @@ const STAFF_KEY = 'staff-list-v1';
 const LANG_KEY = 'lang-pref-v1';
 const LAST_EXPORT_KEY = 'last-export-at-v1';
 const LAST_SEEN_VERSION_KEY = 'last-seen-app-version-v1';
+const LAST_RUN_VERSION_KEY = 'last-run-app-version-v1';
+const SNAPSHOT_PREFIX = 'auto-snapshot-v1:';
 let pendingUpdateVersion = null;
 // Bump APP_VERSION on every release. Point VERSION_CHECK_URL at a version.json file hosted
 // alongside this html (e.g. on GitHub Pages) once you set that up - leave it blank to disable
 // the update-check entirely (the app works fine either way).
-const APP_VERSION = '1.1.2';
+const APP_VERSION = '1.1.3';
 const VERSION_CHECK_URL = 'https://shizune113.github.io/SimpleTaskTracker/version.json';
 
 // DATA_VERSION is separate from APP_VERSION: bump this only when the *shape* of saved data
@@ -370,7 +372,7 @@ const I18N = {
     addPersonModalTitle: '新增负责人', placeholderPersonName: '输入名字',
     manageStaffTitle: '管理负责人', emptyStaff: '还没有添加负责人',
     footerCredit: '本软件由猫猫幻雪与Claude共同完成喵o( •w• )o',
-    updateAvailableTitle: '有新版本喵!', updateVersionLabel: '版本', updateLater: '稍后', updateReload: '立即更新',
+    updateAvailableTitle: '有新版本喵!', updateVersionLabel: '版本', updateLater: '稍后', updateReload: '知道了',
     updateBackupWarning: '强烈建议先导出一份备份,谨防意外', updateBackupBtn: '导出备份', updateBackedUp: '已备份 ✓',
     updateRollbackLinkText: '如果新版本有问题,点此回到上一版本',
     backupReminder: '距上次备份 {days} 天了,建议导出一份', backupReminderNever: '还没有导出过备份,建议现在导出一份',
@@ -405,7 +407,7 @@ const I18N = {
     addPersonModalTitle: 'Add assignee', placeholderPersonName: 'Enter a name',
     manageStaffTitle: 'Manage assignees', emptyStaff: 'No assignees added yet',
     footerCredit: 'Built by huanxue the cat & Claude o( •w• )o',
-    updateAvailableTitle: 'New version available!', updateVersionLabel: 'Version', updateLater: 'Later', updateReload: 'Update now',
+    updateAvailableTitle: 'New version available!', updateVersionLabel: 'Version', updateLater: 'Later', updateReload: 'Got it',
     updateBackupWarning: 'Strongly recommended: export a backup first, just in case', updateBackupBtn: 'Export backup', updateBackedUp: 'Backed up ✓',
     updateRollbackLinkText: 'If the new version has issues, click here to go back to the previous one',
     backupReminder: "It's been {days} days since your last backup — worth exporting one", backupReminderNever: "You haven't exported a backup yet — worth doing one now",
@@ -507,6 +509,52 @@ async function storageGet(key){
 async function storageSet(key, value){
   if (typeof window.storage !== 'undefined'){ try { await window.storage.set(key, value, false); return true; } catch(e){} }
   try { localStorage.setItem(key, value); return true; } catch(e){ return false; }
+}
+
+// ---------- pre-flight auto-snapshot ----------
+// On the FIRST run of any new app version, copy the raw stored strings verbatim into a
+// snapshot key BEFORE any migration/normalization/self-check logic runs. The copy step is
+// deliberately trivial (read string -> store string, zero parsing) so that even if a new
+// version ships with a data-corrupting bug, the snapshot preserves what the previous
+// version left behind. The two newest snapshots are kept.
+const DATA_KEYS_TO_SNAPSHOT = [STORAGE_KEY, ARCHIVE_KEY, NOTES_KEY, STAFF_KEY];
+function listSnapshots(){
+  const keys = [];
+  try {
+    for (let i = 0; i < localStorage.length; i++){
+      const k = localStorage.key(i);
+      if (k && k.startsWith(SNAPSHOT_PREFIX)) keys.push(k);
+    }
+  } catch(e){}
+  return keys.sort((a, b) => Number(a.split(':').pop()) - Number(b.split(':').pop()));
+}
+async function takePreflightSnapshot(){
+  try {
+    const lastRun = localStorage.getItem(LAST_RUN_VERSION_KEY);
+    if (lastRun === APP_VERSION) return; // not the first run of a new version
+    const raw = {};
+    for (const k of DATA_KEYS_TO_SNAPSHOT){
+      const r = await storageGet(k);
+      if (r && typeof r.value === 'string') raw[k] = r.value;
+    }
+    if (Object.keys(raw).length > 0){
+      localStorage.setItem(SNAPSHOT_PREFIX + (lastRun || 'unknown') + ':' + Date.now(), JSON.stringify(raw));
+      const all = listSnapshots();
+      while (all.length > 2){ localStorage.removeItem(all.shift()); }
+    }
+    localStorage.setItem(LAST_RUN_VERSION_KEY, APP_VERSION);
+  } catch(e){ /* snapshotting must never block the app from starting */ }
+}
+async function restoreNewestSnapshot(){
+  const keys = listSnapshots();
+  if (keys.length === 0) return false;
+  try {
+    const raw = JSON.parse(localStorage.getItem(keys[keys.length - 1]));
+    for (const k of Object.keys(raw)){
+      await storageSet(k, raw[k]);
+    }
+    return true;
+  } catch(e){ return false; }
 }
 // ---------- data normalization (backfills missing fields on old saved data so future
 // UI/field changes never crash on load - old data is treated as possibly incomplete) ----------
@@ -1197,7 +1245,7 @@ document.getElementById('updateReloadBtn').addEventListener('click', (e) => {
   if (pendingUpdateVersion){
     try { localStorage.setItem(LAST_SEEN_VERSION_KEY, pendingUpdateVersion); } catch(err){}
   }
-  location.reload();
+  document.getElementById('updateModalBackdrop').classList.remove('open');
 });
 document.getElementById('updateModalBackdrop').addEventListener('click', (e) => { if (e.target.id === 'updateModalBackdrop') e.target.classList.remove('open'); });
 
@@ -1213,17 +1261,30 @@ function showCrashScreen(err){
       <h2 style="color:#b03a2e;font-size:18px;margin-bottom:8px;">出错了,但你的数据还在</h2>
       <p style="color:#4a5568;font-size:13.5px;line-height:1.6;">界面这次加载失败了,不过存储的数据没有丢——先点下面按钮导出一份保存好,然后把这个情况反馈给开发者。</p>
       <button id="crashExportBtn" style="background:#1c2733;color:#fff;border:none;border-radius:8px;padding:12px 22px;font-size:14px;font-weight:700;cursor:pointer;margin-top:14px;">导出数据 / Export data</button>
+      <div id="crashRestoreWrap" style="display:none;margin-top:12px;">
+        <p style="color:#4a5568;font-size:12.5px;line-height:1.5;">系统在上次版本更新前自动存了一份快照,可以一键回到那个状态 / An automatic pre-update snapshot exists — you can roll back to it:</p>
+        <button id="crashRestoreBtn" style="background:#fff;color:#1c2733;border:1px solid #d8dde3;border-radius:8px;padding:10px 18px;font-size:13px;font-weight:700;cursor:pointer;">恢复自动快照 / Restore snapshot</button>
+      </div>
     `;
     document.body.appendChild(wrap);
     document.getElementById('crashExportBtn').addEventListener('click', () => {
       try { exportBackup(); } catch(e2){ alert('导出也失败了,请把这段信息反馈给开发者: ' + (e2 && e2.message)); }
     });
+    if (listSnapshots().length > 0){
+      document.getElementById('crashRestoreWrap').style.display = '';
+      document.getElementById('crashRestoreBtn').addEventListener('click', async () => {
+        const ok = await restoreNewestSnapshot();
+        if (ok) location.reload();
+        else alert('快照恢复失败 / Snapshot restore failed');
+      });
+    }
   } catch(e2){ /* if even the recovery screen fails, there's nothing more we can safely do client-side */ }
 }
 
 // ---------- init ----------
 (async function init(){
   try {
+    await takePreflightSnapshot();
     await loadData();
     runSelfCheck(new Date());
     translatePage();
