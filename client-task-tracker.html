@@ -147,6 +147,7 @@
   </div>
 
   <div class="footer-credit" data-i18n="footerCredit">本软件由猫猫幻雪与Claude共同完成喵o( •w• )o</div>
+  <div class="footer-credit" id="footerVersion" style="margin-top:4px;"></div>
 </div>
 
 <button class="fab" id="addBtn">+</button>
@@ -298,10 +299,12 @@ const NOTES_KEY = 'client-notes-v1';
 const STAFF_KEY = 'staff-list-v1';
 const LANG_KEY = 'lang-pref-v1';
 const LAST_EXPORT_KEY = 'last-export-at-v1';
+const LAST_SEEN_VERSION_KEY = 'last-seen-app-version-v1';
+let pendingUpdateVersion = null;
 // Bump APP_VERSION on every release. Point VERSION_CHECK_URL at a version.json file hosted
 // alongside this html (e.g. on GitHub Pages) once you set that up - leave it blank to disable
 // the update-check entirely (the app works fine either way).
-const APP_VERSION = '1.1.0';
+const APP_VERSION = '1.1.1';
 const VERSION_CHECK_URL = 'https://shizune113.github.io/SimpleTaskTracker/version.json';
 
 // DATA_VERSION is separate from APP_VERSION: bump this only when the *shape* of saved data
@@ -435,6 +438,7 @@ function translatePage(){
   document.querySelectorAll('[data-i18n]').forEach(el => { el.textContent = tr(el.getAttribute('data-i18n')); });
   document.querySelectorAll('[data-i18n-placeholder]').forEach(el => { el.placeholder = tr(el.getAttribute('data-i18n-placeholder')); });
   document.getElementById('langToggleBtn').textContent = currentLang === 'zh' ? 'EN' : '中文';
+  document.getElementById('footerVersion').textContent = 'v' + APP_VERSION;
   renderWhoFilterChips();
   checkBackupReminder();
 }
@@ -1040,7 +1044,6 @@ document.getElementById('addBtn').addEventListener('click', () => {
   document.getElementById('f-linked-wrap').style.display = 'none';
   newType = 'BAS'; newWho = '我';
   [...document.getElementById('f-type').children].forEach(b => b.classList.toggle('sel', b.dataset.v==='BAS'));
-  [...document.getElementById('f-quarter').children].forEach(b => b.classList.toggle('sel', b.dataset.v==='0'));
   renderWhoModalChips();
   updateFieldVisibility();
   document.getElementById('modalBackdrop').classList.add('open');
@@ -1135,36 +1138,54 @@ async function checkForUpdate(){
     const res = await fetch(VERSION_CHECK_URL + (VERSION_CHECK_URL.includes('?') ? '&' : '?') + 't=' + Date.now(), { cache: 'no-store' });
     if (!res.ok) return;
     const data = await res.json();
-    if (data && data.version && data.version !== APP_VERSION){
-      const notes = (currentLang === 'zh' ? data.notes_zh : data.notes_en) || data.notes_zh || data.notes_en || [];
-      document.getElementById('updateVersionText').textContent = data.version;
-      document.getElementById('updateNotesList').innerHTML = notes.map(n => `<li>${escapeHtml(n)}</li>`).join('');
+    if (!data || !data.version) return;
 
-      // reset the backup gate every time a new update is shown
-      const reloadBtn = document.getElementById('updateReloadBtn');
-      const backupBtn = document.getElementById('updateBackupBtn');
-      reloadBtn.disabled = true;
-      reloadBtn.style.opacity = '0.5';
-      reloadBtn.style.cursor = 'default';
-      backupBtn.disabled = false;
-      backupBtn.textContent = tr('updateBackupBtn');
+    let lastSeen = null;
+    try { lastSeen = localStorage.getItem(LAST_SEEN_VERSION_KEY); } catch(e){}
 
-      const rollbackWrap = document.getElementById('updateRollbackWrap');
-      if (data.previous_url){
-        document.getElementById('updateRollbackLink').href = data.previous_url;
-        rollbackWrap.style.display = '';
-      } else {
-        rollbackWrap.style.display = 'none';
-      }
-
-      document.getElementById('updateModalBackdrop').classList.add('open');
+    if (lastSeen === null){
+      // genuine first-ever open on this browser - nothing to "update" from, so just
+      // silently baseline to the current version without showing a popup.
+      try { localStorage.setItem(LAST_SEEN_VERSION_KEY, data.version); } catch(e){}
+      return;
     }
+    if (lastSeen === data.version) return; // this browser has already acknowledged this version
+
+    pendingUpdateVersion = data.version;
+    const notes = (currentLang === 'zh' ? data.notes_zh : data.notes_en) || data.notes_zh || data.notes_en || [];
+    document.getElementById('updateVersionText').textContent = data.version;
+    document.getElementById('updateNotesList').innerHTML = notes.map(n => `<li>${escapeHtml(n)}</li>`).join('');
+
+    // reset the backup gate every time a new update is shown
+    const reloadBtn = document.getElementById('updateReloadBtn');
+    const backupBtn = document.getElementById('updateBackupBtn');
+    reloadBtn.disabled = true;
+    reloadBtn.style.opacity = '0.5';
+    reloadBtn.style.cursor = 'default';
+    backupBtn.disabled = false;
+    backupBtn.textContent = tr('updateBackupBtn');
+
+    const rollbackWrap = document.getElementById('updateRollbackWrap');
+    if (data.previous_url){
+      document.getElementById('updateRollbackLink').href = data.previous_url;
+      rollbackWrap.style.display = '';
+    } else {
+      rollbackWrap.style.display = 'none';
+    }
+
+    document.getElementById('updateModalBackdrop').classList.add('open');
   } catch(e) { /* offline or host unreachable - fail silently, this is a non-essential nicety */ }
 }
 document.getElementById('updateBackupBtn').addEventListener('click', () => {
-  exportBackup();
-  showToast(tr('toastExported'));
   const reloadBtn = document.getElementById('updateReloadBtn');
+  try {
+    exportBackup();
+    showToast(tr('toastExported'));
+  } catch(err){
+    // Don't let a failed backup permanently trap the user in this modal - warn them,
+    // but still let them proceed rather than locking them out of their own software.
+    showToast(tr('toastSaveFail'));
+  }
   reloadBtn.disabled = false;
   reloadBtn.style.opacity = '1';
   reloadBtn.style.cursor = 'pointer';
@@ -1173,6 +1194,9 @@ document.getElementById('updateBackupBtn').addEventListener('click', () => {
 document.getElementById('updateDismissBtn').addEventListener('click', () => document.getElementById('updateModalBackdrop').classList.remove('open'));
 document.getElementById('updateReloadBtn').addEventListener('click', (e) => {
   if (e.target.disabled) return;
+  if (pendingUpdateVersion){
+    try { localStorage.setItem(LAST_SEEN_VERSION_KEY, pendingUpdateVersion); } catch(err){}
+  }
   location.reload();
 });
 document.getElementById('updateModalBackdrop').addEventListener('click', (e) => { if (e.target.id === 'updateModalBackdrop') e.target.classList.remove('open'); });
