@@ -39,6 +39,13 @@
   .chip.add-chip { width: 34px; padding: 7px 0; text-align: center; font-weight: 700; }
 
   .section-label { font-size: 11px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--ink-soft); margin: 18px 0 8px 2px; }
+  .section-label-toggle { cursor: pointer; user-select: none; display: flex; align-items: center; gap: 4px; }
+  .section-label-toggle .chevron { font-size: 9px; display: inline-block; width: 10px; }
+  .update-version-group { margin-bottom: 12px; }
+  .update-version-group:last-child { margin-bottom: 0; }
+  .update-version-tag { font-size: 12px; font-weight: 700; color: var(--ink); margin-bottom: 3px; }
+  .update-version-date { font-size: 11px; font-weight: 500; color: var(--ink-soft); }
+  .update-version-group ul { font-size: 13px; color: var(--ink-soft); line-height: 1.6; padding-left: 18px; margin: 0; }
   .type-badge { display: inline-block; font-size: 10.5px; font-weight: 700; padding: 2px 7px; border-radius: 20px; letter-spacing: 0.02em; }
   .type-BAS { background: var(--bas-bg); color: var(--bas); }
   .type-Return { background: var(--ret-bg); color: var(--ret); }
@@ -275,7 +282,7 @@
   <div class="modal">
     <h2 data-i18n="updateAvailableTitle">有新版本喵!</h2>
     <p><span data-i18n="updateVersionLabel">版本</span> <strong id="updateVersionText"></strong></p>
-    <ul id="updateNotesList" style="font-size:13.5px;color:var(--ink-soft);line-height:1.6;padding-left:18px;margin:8px 0 12px;"></ul>
+    <div id="updateNotesGroups" style="max-height:40vh;overflow-y:auto;margin:8px 0 12px;"></div>
     <p style="color:var(--danger);font-weight:600;font-size:13px;" data-i18n="updateBackupWarning">强烈建议先导出一份备份,谨防意外</p>
     <div class="modal-actions" style="margin-top:8px;">
       <button class="btn-cancel" id="updateBackupBtn" data-i18n="updateBackupBtn">导出备份</button>
@@ -310,7 +317,7 @@ let pendingUpdateVersion = null;
 // Bump APP_VERSION on every release. Point VERSION_CHECK_URL at a version.json file hosted
 // alongside this html (e.g. on GitHub Pages) once you set that up - leave it blank to disable
 // the update-check entirely (the app works fine either way).
-const APP_VERSION = '1.2.0';
+const APP_VERSION = '1.2.1';
 const VERSION_CHECK_URL = 'https://shizune113.github.io/SimpleTaskTracker/version.json';
 
 // DATA_VERSION is separate from APP_VERSION: bump this only when the *shape* of saved data
@@ -361,6 +368,9 @@ let undoTimeout = null;
 let archiveSortMode = 'time';
 let currentLang = 'zh';
 let selectedWhoFilter = null;
+const COLLAPSED_KEY = 'collapsed-types-v1';
+let collapsedTypes = {};
+function saveCollapsedTypes(){ try { localStorage.setItem(COLLAPSED_KEY, JSON.stringify(collapsedTypes)); } catch(e){} }
 
 // ---------- i18n ----------
 const I18N = {
@@ -620,6 +630,7 @@ async function loadData(){
   try { const n = await storageGet(NOTES_KEY); clientNotes = n ? JSON.parse(n.value) : {}; } catch(e){ clientNotes = {}; }
   try { const s = await storageGet(STAFF_KEY); staffList = s ? JSON.parse(s.value) : []; } catch(e){ staffList = []; }
   try { currentLang = localStorage.getItem(LANG_KEY) || 'en'; } catch(e){ currentLang = 'en'; }
+  try { collapsedTypes = JSON.parse(localStorage.getItem(COLLAPSED_KEY) || '{}'); } catch(e){ collapsedTypes = {}; }
 
   let storedSchemaVersion = 1;
   try { const sv = await storageGet(SCHEMA_KEY); storedSchemaVersion = sv ? parseInt(sv.value, 10) || 1 : 1; } catch(e){}
@@ -755,10 +766,23 @@ function render(){
   typeOrder.forEach(type => {
     const group = visibleTasks.filter(t => t.type === type);
     if (group.length === 0) return;
+    group.sort((a, b) => {
+      const aActive = a.status !== 'not_started';
+      const bActive = b.status !== 'not_started';
+      if (aActive !== bActive) return aActive ? -1 : 1;
+      return a.client.localeCompare(b.client, 'zh');
+    });
     const label = document.createElement('div');
-    label.className = 'section-label';
-    label.textContent = typeLabel(type);
+    label.className = 'section-label section-label-toggle';
+    const collapsed = !!collapsedTypes[type];
+    label.innerHTML = `<span class="chevron">${collapsed ? '▸' : '▾'}</span> ${typeLabel(type)}`;
+    label.addEventListener('click', () => {
+      collapsedTypes[type] = !collapsedTypes[type];
+      saveCollapsedTypes();
+      render();
+    });
     container.appendChild(label);
+    if (collapsed) return;
 
     group.forEach(t => {
      try {
@@ -1203,13 +1227,25 @@ document.getElementById('archiveSort').addEventListener('click', (e) => {
 });
 
 // ---------- update check ----------
+function buildNotesGroupsHtml(missedVersions){
+  return missedVersions.map(v => {
+    const notes = (currentLang === 'zh' ? v.notes_zh : v.notes_en) || v.notes_zh || v.notes_en || [];
+    const dateTag = v.date ? ` <span class="update-version-date">${escapeHtml(v.date)}</span>` : '';
+    return `<div class="update-version-group">
+      <div class="update-version-tag">v${escapeHtml(v.version)}${dateTag}</div>
+      <ul>${notes.map(n => `<li>${escapeHtml(n)}</li>`).join('')}</ul>
+    </div>`;
+  }).join('');
+}
 async function checkForUpdate(){
   if (!VERSION_CHECK_URL) return;
   try {
     const res = await fetch(VERSION_CHECK_URL + (VERSION_CHECK_URL.includes('?') ? '&' : '?') + 't=' + Date.now(), { cache: 'no-store' });
     if (!res.ok) return;
     const data = await res.json();
-    if (!data || !data.version) return;
+    const versions = data && Array.isArray(data.versions) ? data.versions : null;
+    if (!versions || versions.length === 0 || !versions[0].version) return;
+    const latestVersion = versions[0].version;
 
     let lastSeen = null;
     try { lastSeen = localStorage.getItem(LAST_SEEN_VERSION_KEY); } catch(e){}
@@ -1217,15 +1253,20 @@ async function checkForUpdate(){
     if (lastSeen === null){
       // genuine first-ever open on this browser - nothing to "update" from, so just
       // silently baseline to the current version without showing a popup.
-      try { localStorage.setItem(LAST_SEEN_VERSION_KEY, data.version); } catch(e){}
+      try { localStorage.setItem(LAST_SEEN_VERSION_KEY, latestVersion); } catch(e){}
       return;
     }
-    if (lastSeen === data.version) return; // this browser has already acknowledged this version
+    if (lastSeen === latestVersion) return; // this browser has already acknowledged the latest version
 
-    pendingUpdateVersion = data.version;
-    const notes = (currentLang === 'zh' ? data.notes_zh : data.notes_en) || data.notes_zh || data.notes_en || [];
-    document.getElementById('updateVersionText').textContent = data.version;
-    document.getElementById('updateNotesList').innerHTML = notes.map(n => `<li>${escapeHtml(n)}</li>`).join('');
+    // Show notes for EVERY version newer than what this browser last saw, not just the
+    // latest - so skipping several releases still surfaces everything that changed.
+    const idx = versions.findIndex(v => v.version === lastSeen);
+    const missed = idx === -1 ? versions : versions.slice(0, idx);
+    if (missed.length === 0) return;
+
+    pendingUpdateVersion = latestVersion;
+    document.getElementById('updateVersionText').textContent = latestVersion;
+    document.getElementById('updateNotesGroups').innerHTML = buildNotesGroupsHtml(missed);
 
     // reset the backup gate every time a new update is shown
     const reloadBtn = document.getElementById('updateReloadBtn');

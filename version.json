@@ -1,12 +1,87 @@
 {
-  "version": "1.2.0",
-  "notes_zh": [
-    "🚨 重要修正:BAS四个季度的截止日之前全部写成28号,实际应该是 Jul-Sep→25 Nov / Oct-Dec→28 Feb / Jan-Mar→26 May / Apr-Jun→25 Aug",
-    "✨ 已建好的任务会自动跟着修正,不用手动改——包括进行中、历史记录、甚至你之前导出的旧备份文件,重新导入也会自动修好"
-  ],
-  "notes_en": [
-    "🚨 Important fix: BAS due dates were all wrong (28th every quarter) — corrected to the real dates: Jul-Sep→25 Nov / Oct-Dec→28 Feb / Jan-Mar→26 May / Apr-Jun→25 Aug",
-    "✨ Existing tasks are automatically corrected, no manual fixing needed — this covers active tasks, archived history, and even old backup files if you re-import them"
-  ],
-  "previous_url": ""
+  "previous_url": "",
+  "versions": [
+    {
+      "version": "1.2.1",
+      "notes_zh": [
+        "📋 进行中列表现在自动排序:能开工的任务(含已过期)排最上面,还没到开始时间的排最下面,同一组内再按客户名字母排",
+        "🗂️ BAS/Return/Other三个分类现在可以折叠了,点分类标题就能收起/展开,任务多起来的时候更清爽",
+        "📜 更新公告改成了完整历史记录——就算你隔了好几个版本才打开,也能看到中间错过的全部更新内容,不只是最新一条"
+      ],
+      "notes_en": [
+        "📋 The active list now auto-sorts: actionable tasks (including overdue) float to the top, not-yet-started ones sink to the bottom, and each group is alphabetised by client name",
+        "🗂️ BAS/Return/Other sections can now be collapsed — click the section header to fold it away, handy once the list gets long",
+        "📜 Update notes now show your FULL missed history — skip a few versions and you'll still see everything that changed, not just the latest entry"
+      ],
+      "date": "2026-08-18"
+    },
+    {
+      "version": "1.2.0",
+      "notes_zh": [
+        "🚨 重要修正:BAS四个季度的截止日之前全部写成28号,实际应该是 Jul-Sep→25 Nov / Oct-Dec→28 Feb / Jan-Mar→26 May / Apr-Jun→25 Aug",
+        "✨ 已建好的任务会自动跟着修正,不用手动改——包括进行中、历史记录、甚至你之前导出的旧备份文件,重新导入也会自动修好"
+      ],
+      "notes_en": [
+        "🚨 Important fix: BAS due dates were all wrong (28th every quarter) — corrected to the real dates: Jul-Sep→25 Nov / Oct-Dec→28 Feb / Jan-Mar→26 May / Apr-Jun→25 Aug",
+        "✨ Existing tasks are automatically corrected, no manual fixing needed — this covers active tasks, archived history, and even old backup files if you re-import them"
+      ],
+      "date": "2026-08-18"
+    },
+    {
+      "version": "1.1.3",
+      "notes_zh": [
+        "🛡️ 数据保险箱:每次版本更新时,系统会在新代码碰你的数据之前自动存一份快照——就算未来某次更新翻车,也能一键回到更新前的状态喵",
+        "🐛 诚实修复:\"立即更新\"按钮改名\"知道了\"——你打开时其实已经是新版了,之前那个按钮属于装装样子😂"
+      ],
+      "notes_en": [
+        "🛡️ Data vault: every version update now auto-snapshots your data BEFORE the new code touches it — if a future update ever breaks things, one click rolls you back",
+        "🐛 Honesty patch: \"Update now\" renamed to \"Got it\" — you're already on the new version when you open the page, so that button was pure theatre 😂"
+      ],
+      "date": "2026-08-18"
+    },
+    {
+      "version": "1.1.2",
+      "notes_zh": [
+        "🛠️ 系统升级:更新提醒终于装上了真的记忆——以后版本一变,你和同事都会准时收到这种弹窗喵",
+        "🐛 修复:导出备份万一失败也不会再把人卡在弹窗里出不去了"
+      ],
+      "notes_en": [
+        "🛠️ Under the hood: update notifications now actually remember what you've seen — future bumps will reliably ping you and your teammates",
+        "🐛 Fixed: a failed backup export could no longer trap you inside the update popup"
+      ],
+      "date": "2026-08-18"
+    },
+    {
+      "version": "1.1.1",
+      "notes_zh": [
+        "🐛 修复:新增任务按钮点了没反应的问题(上个版本改BAS选择器时留下的漏网bug)"
+      ],
+      "notes_en": [
+        "🐛 Fixed: the + (add task) button doing nothing on click, a leftover bug from the previous BAS picker rework"
+      ],
+      "date": "2026-08-18"
+    },
+    {
+      "version": "1.1.0",
+      "notes_zh": [
+        "🎯 新玩法:BAS建卡不用再看老天脸色——直接选Q几 + 填年份,想建哪年建哪年!",
+        "🌏 新人友好:同事第一次打开默认英文界面,不会被劝退喵"
+      ],
+      "notes_en": [
+        "🎯 New: BAS task creation now lets you pick any quarter + year directly — no more waiting on the calendar!",
+        "🌏 QoL: First-time visitors now see English by default, so new teammates aren't dropped straight into Chinese"
+      ],
+      "date": "2026-08-18"
+    },
+    {
+      "version": "1.0.0",
+      "notes_zh": [
+        "🎉 首个发布版本"
+      ],
+      "notes_en": [
+        "🎉 Initial release"
+      ],
+      "date": "2026-08-18"
+    }
+  ]
 }
