@@ -310,7 +310,7 @@ let pendingUpdateVersion = null;
 // Bump APP_VERSION on every release. Point VERSION_CHECK_URL at a version.json file hosted
 // alongside this html (e.g. on GitHub Pages) once you set that up - leave it blank to disable
 // the update-check entirely (the app works fine either way).
-const APP_VERSION = '1.1.3';
+const APP_VERSION = '1.2.0';
 const VERSION_CHECK_URL = 'https://shizune113.github.io/SimpleTaskTracker/version.json';
 
 // DATA_VERSION is separate from APP_VERSION: bump this only when the *shape* of saved data
@@ -323,9 +323,25 @@ const VERSION_CHECK_URL = 'https://shizune113.github.io/SimpleTaskTracker/versio
 //     b.tasks = b.tasks.map(t => { if (t.dueDate) { t.due = t.dueDate; delete t.dueDate; } return t; });
 //     return b;
 //   };
-const DATA_VERSION = 1;
+const DATA_VERSION = 2;
 const SCHEMA_KEY = 'data-schema-version-v1';
-const DATA_MIGRATIONS = {};
+const DATA_MIGRATIONS = {
+  // v1 -> v2: BAS due dates were wrong (28th for every quarter) - corrected to the real
+  // lodgment dates (25 Nov / 28 Feb / 26 May / 25 Aug). Re-derive `due` from each task's
+  // stored qStart via the now-corrected quarterFromStart() - nothing else is touched.
+  1: (b) => {
+    const fixDue = (t) => {
+      if (t.type === 'BAS' && t.qStart) {
+        const q = quarterFromStart(parseLocalDate(t.qStart));
+        t.due = fmt(q.due);
+      }
+      return t;
+    };
+    b.tasks = (b.tasks || []).map(fixDue);
+    b.archive = (b.archive || []).map(fixDue);
+    return b;
+  }
+};
 function migrateBundle(bundle, fromVersion){
   let v = fromVersion || 1;
   let guard = 0;
@@ -465,10 +481,10 @@ function parseLocalDate(s){ if (!s) return null; const [y,m,d] = s.split('-').ma
 function calendarQuarterStart(d){ const qStartMonth = Math.floor(d.getMonth()/3)*3; return new Date(d.getFullYear(), qStartMonth, 1); }
 function quarterFromStart(qStart){
   const m = qStart.getMonth()+1; const y = qStart.getFullYear();
-  if (m===1) return { label:`Jan-Mar${shortY(y)}`,  workStart:new Date(y,3,1),  due:new Date(y,4,28) };
-  if (m===4) return { label:`Apr-Jun${shortY(y)}`,  workStart:new Date(y,6,1),  due:new Date(y,7,28) };
-  if (m===7) return { label:`Jul-Sep${shortY(y)}`,  workStart:new Date(y,9,1),  due:new Date(y,10,28) };
-  return          { label:`Oct-Dec${shortY(y)}`,  workStart:new Date(y+1,0,1), due:new Date(y+1,1,28) };
+  if (m===1) return { label:`Jan-Mar${shortY(y)}`,  workStart:new Date(y,3,1),  due:new Date(y,4,26) };  // May 26
+  if (m===4) return { label:`Apr-Jun${shortY(y)}`,  workStart:new Date(y,6,1),  due:new Date(y,7,25) };  // Aug 25
+  if (m===7) return { label:`Jul-Sep${shortY(y)}`,  workStart:new Date(y,9,1),  due:new Date(y,10,25) }; // Nov 25
+  return          { label:`Oct-Dec${shortY(y)}`,  workStart:new Date(y+1,0,1), due:new Date(y+1,1,28) };  // Feb 28 (unchanged)
 }
 function currentFYStartYear(now){ const m = now.getMonth()+1; const y = now.getFullYear(); return (m>=7) ? y : y-1; }
 function returnFieldsFromFYStart(fy){ const workStart = new Date(fy+1, 6, 1); return { label: `FY${shortY(fy)}-${shortY(fy+1)}`, workStart }; }
