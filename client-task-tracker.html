@@ -9,6 +9,7 @@
   :root {
     --ink: #1c2733; --ink-soft: #4a5568; --paper: #f3f5f7; --paper-raised: #ffffff; --line: #d8dde3;
     --bas: #1f7a6c; --bas-bg: #e6f2ef; --ret: #a8641a; --ret-bg: #fbeee0; --oth: #5b4b9e; --oth-bg: #ede9f7;
+    --fbt: #1a5f8c; --fbt-bg: #e3eef5;
     --danger: #b03a2e; --danger-bg: #fbe9e6; --ok: #2e7d46;
   }
   * { box-sizing: border-box; }
@@ -50,6 +51,8 @@
   .type-BAS { background: var(--bas-bg); color: var(--bas); }
   .type-Return { background: var(--ret-bg); color: var(--ret); }
   .type-Other { background: var(--oth-bg); color: var(--oth); }
+  .type-FBT { background: var(--fbt-bg); color: var(--fbt); }
+  .sort-label { font-size: 11px; color: var(--ink-soft); font-weight: 600; padding: 7px 2px; align-self: center; }
 
   .task-row { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
   .card { background: var(--paper-raised); border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; margin-bottom: 0; display: flex; align-items: center; gap: 10px; cursor: pointer; flex: 1; min-width: 0; }
@@ -144,6 +147,7 @@
 
   <div id="activeSearchWrap" class="search"><input id="activeSearch" data-i18n-placeholder="searchActivePlaceholder" placeholder="搜索客户名..."></div>
   <div id="whoFilterRow" class="chip-row"></div>
+  <div id="sortModeRow" class="chip-row"></div>
   <div id="activeView"></div>
 
   <div id="archiveView" style="display:none;">
@@ -183,6 +187,7 @@
       <div class="seg" id="f-type">
         <button data-v="BAS" class="sel" data-i18n="typeBAS">BAS(季度)</button>
         <button data-v="Return" data-i18n="typeReturn">Return(年度)</button>
+        <button data-v="FBT" data-i18n="typeFBT">FBT(年度)</button>
         <button data-v="Other" data-i18n="typeOther">其他</button>
       </div>
     </div>
@@ -208,6 +213,19 @@
         <input type="number" id="f-fy-end" style="width:64px;" placeholder="26">
       </div>
       <div id="fyError" style="color:var(--danger);font-size:12px;margin-top:5px;display:none;"></div>
+    </div>
+    <div class="field" id="f-fbt-wrap" style="display:none;">
+      <label data-i18n="labelFBT">FBT财年</label>
+      <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
+        <span style="font-size:13px;font-weight:600;color:var(--ink-soft);">01 April</span>
+        <input type="number" id="f-fbt-start" style="width:56px;" placeholder="25">
+        <span style="font-size:13px;font-weight:600;color:var(--ink-soft);">FY</span>
+        <span style="font-size:13px;font-weight:600;color:var(--ink-soft);" data-i18n="fyTo">to</span>
+        <span style="font-size:13px;font-weight:600;color:var(--ink-soft);">31 March</span>
+        <input type="number" id="f-fbt-end" style="width:56px;" placeholder="26">
+        <span style="font-size:13px;font-weight:600;color:var(--ink-soft);">FY</span>
+      </div>
+      <div id="fbtError" style="color:var(--danger);font-size:12px;margin-top:5px;display:none;"></div>
     </div>
     <div class="field" id="f-other-wrap" style="display:none;">
       <label data-i18n="labelOtherDesc">任务描述</label>
@@ -317,7 +335,7 @@ let pendingUpdateVersion = null;
 // Bump APP_VERSION on every release. Point VERSION_CHECK_URL at a version.json file hosted
 // alongside this html (e.g. on GitHub Pages) once you set that up - leave it blank to disable
 // the update-check entirely (the app works fine either way).
-const APP_VERSION = '1.2.1';
+const APP_VERSION = '1.3.0';
 const VERSION_CHECK_URL = 'https://shizune113.github.io/SimpleTaskTracker/version.json';
 
 // DATA_VERSION is separate from APP_VERSION: bump this only when the *shape* of saved data
@@ -368,6 +386,9 @@ let undoTimeout = null;
 let archiveSortMode = 'time';
 let currentLang = 'zh';
 let selectedWhoFilter = null;
+let sortMode = 'client';
+const SORT_MODE_KEY = 'sort-mode-v1';
+function saveSortMode(){ try { localStorage.setItem(SORT_MODE_KEY, sortMode); } catch(e){} }
 const COLLAPSED_KEY = 'collapsed-types-v1';
 let collapsedTypes = {};
 function saveCollapsedTypes(){ try { localStorage.setItem(COLLAPSED_KEY, JSON.stringify(collapsedTypes)); } catch(e){} }
@@ -380,7 +401,9 @@ const I18N = {
     sortTime: '按时间', sortClient: '按客户',
     modalAddTitle: '新增任务', labelClient: '客户名', placeholderClient: '例如 ABC Pty Ltd',
     labelLinked: '关联客户', labelLinkedName: '关联客户名', placeholderLinkedName: '例如 ABC Holdings Pty Ltd',
-    labelType: '任务类型', typeBAS: 'BAS(季度)', typeReturn: 'Return(年度)', typeOther: '其他',
+    labelType: '任务类型', typeBAS: 'BAS(季度)', typeReturn: 'Return(年度)', typeFBT: 'FBT(年度)', typeOther: '其他',
+    labelFBT: 'FBT财年',
+    labelSortBy: '排序:', sortByClient: '客户名', sortByStatus: '状态', sortByLinked: '关联客户',
     labelQuarter: '选择季度', qPrev: '上季度', qCurrent: '本季度', qNext: '下季度',
     quarterQ1: 'Q1 Jul-Sep', quarterQ2: 'Q2 Oct-Dec', quarterQ3: 'Q3 Jan-Mar', quarterQ4: 'Q4 Apr-Jun',
     labelFY: '选择财年', fyTo: 'to', fyErrorMsg: '填写内容大于一年喵', toastNeedFY: '请填写完整的财年喵',
@@ -416,7 +439,9 @@ const I18N = {
     sortTime: 'By time', sortClient: 'By client',
     modalAddTitle: 'New Task', labelClient: 'Client name', placeholderClient: 'e.g. ABC Pty Ltd',
     labelLinked: 'Linked client', labelLinkedName: 'Linked client name', placeholderLinkedName: 'e.g. ABC Holdings Pty Ltd',
-    labelType: 'Task type', typeBAS: 'BAS (Quarterly)', typeReturn: 'Return (Annual)', typeOther: 'Other',
+    labelType: 'Task type', typeBAS: 'BAS (Quarterly)', typeReturn: 'Return (Annual)', typeFBT: 'FBT (Annual)', typeOther: 'Other',
+    labelFBT: 'FBT year',
+    labelSortBy: 'Sort:', sortByClient: 'Client name', sortByStatus: 'Status', sortByLinked: 'Linked client',
     labelQuarter: 'Select quarter', qPrev: 'Last quarter', qCurrent: 'This quarter', qNext: 'Next quarter',
     quarterQ1: 'Q1 Jul-Sep', quarterQ2: 'Q2 Oct-Dec', quarterQ3: 'Q3 Jan-Mar', quarterQ4: 'Q4 Apr-Jun',
     labelFY: 'Select financial year', fyTo: 'to', fyErrorMsg: 'That spans more than one financial year', toastNeedFY: 'Please fill in both financial years',
@@ -475,6 +500,7 @@ function translatePage(){
   document.getElementById('footerVersion').textContent = 'v' + APP_VERSION;
   document.getElementById('dataWarningEl').innerHTML = tr('dataWarning');
   renderWhoFilterChips();
+  renderSortModeChips();
   checkBackupReminder();
 }
 
@@ -498,6 +524,13 @@ function quarterFromStart(qStart){
 }
 function currentFYStartYear(now){ const m = now.getMonth()+1; const y = now.getFullYear(); return (m>=7) ? y : y-1; }
 function returnFieldsFromFYStart(fy){ const workStart = new Date(fy+1, 6, 1); return { label: `FY${shortY(fy)}-${shortY(fy+1)}`, workStart }; }
+function currentFBTStartYear(now){ const m = now.getMonth()+1; const y = now.getFullYear(); return (m>=4) ? y : y-1; }
+function fbtFieldsFromStart(fbtStart){
+  const fbtEnd = fbtStart + 1;
+  const workStart = new Date(fbtEnd, 3, 1);  // 1 Apr of the end year (day after 31 Mar close)
+  const due = new Date(fbtEnd, 5, 25);        // 25 Jun of the end year
+  return { label: `Apr${shortY(fbtStart)}-Mar${shortY(fbtEnd)}`, workStart, due };
+}
 function normalizeYear(v){ return v < 100 ? 2000 + v : v; }
 function computeNewTaskPeriod(type, now, quarterOffset){
   if (type === 'BAS'){
@@ -511,6 +544,12 @@ function computeNewTaskPeriod(type, now, quarterOffset){
     const r = returnFieldsFromFYStart(fy);
     const started = now >= r.workStart;
     return { period: r.label, fyStartYear: fy, due: null, workStart: fmt(r.workStart), status: started ? 'pending' : 'not_started' };
+  }
+  if (type === 'FBT'){
+    const fbtStart = currentFBTStartYear(now) - 1;
+    const f = fbtFieldsFromStart(fbtStart);
+    const started = now >= f.workStart;
+    return { period: f.label, fbtStartYear: fbtStart, due: fmt(f.due), workStart: fmt(f.workStart), status: started ? 'pending' : 'not_started' };
   }
   return { period: null, due: null, workStart: null, status: 'pending' };
 }
@@ -527,6 +566,12 @@ function buildNextTask(t, now){
     const q = quarterFromStart(nextQStart);
     const started = now >= q.workStart;
     return { ...base, status: started ? 'pending' : 'not_started', period: q.label, qStart: fmt(nextQStart), due: fmt(q.due), workStart: fmt(q.workStart) };
+  }
+  if (t.type === 'FBT'){
+    const nextFbtStart = (t.fbtStartYear !== undefined ? t.fbtStartYear : currentFBTStartYear(now)-1) + 1;
+    const f = fbtFieldsFromStart(nextFbtStart);
+    const started = now >= f.workStart;
+    return { ...base, status: started ? 'pending' : 'not_started', period: f.label, fbtStartYear: nextFbtStart, due: fmt(f.due), workStart: fmt(f.workStart) };
   }
   const nextFY = (t.fyStartYear !== undefined ? t.fyStartYear : currentFYStartYear(now)-1) + 1;
   const r = returnFieldsFromFYStart(nextFY);
@@ -597,7 +642,7 @@ function normalizeTask(t){
     id: t.id || ('t'+Date.now()+Math.random().toString(36).slice(2,7)),
     chainId: t.chainId || null,
     client: t.client || '',
-    type: (t.type === 'BAS' || t.type === 'Return' || t.type === 'Other') ? t.type : 'Other',
+    type: (t.type === 'BAS' || t.type === 'Return' || t.type === 'FBT' || t.type === 'Other') ? t.type : 'Other',
     who: t.who || '我',
     status: (t.status === 'not_started') ? 'not_started' : 'pending',
     period: t.period || null,
@@ -605,6 +650,7 @@ function normalizeTask(t){
     workStart: t.workStart || null,
     qStart: t.qStart,
     fyStartYear: t.fyStartYear,
+    fbtStartYear: t.fbtStartYear,
     linkedClient: t.linkedClient || null,
     note: t.note || '',
     workStatus: t.workStatus || '',
@@ -620,6 +666,7 @@ function normalizeArchiveEntry(a){
     client: a.client || '', type: a.type || 'Other', period: a.period || '', who: a.who || '我',
     createdAt: a.createdAt || null, completedAt: a.completedAt || null, archivedAt: a.archivedAt || fmt(new Date()),
     qStart: a.qStart || null, fyStartYear: (a.fyStartYear !== undefined ? a.fyStartYear : null),
+    fbtStartYear: (a.fbtStartYear !== undefined ? a.fbtStartYear : null),
     due: a.due || null, workStart: a.workStart || null, linkedClient: a.linkedClient || null, note: a.note || ''
   };
 }
@@ -631,6 +678,7 @@ async function loadData(){
   try { const s = await storageGet(STAFF_KEY); staffList = s ? JSON.parse(s.value) : []; } catch(e){ staffList = []; }
   try { currentLang = localStorage.getItem(LANG_KEY) || 'en'; } catch(e){ currentLang = 'en'; }
   try { collapsedTypes = JSON.parse(localStorage.getItem(COLLAPSED_KEY) || '{}'); } catch(e){ collapsedTypes = {}; }
+  try { sortMode = localStorage.getItem(SORT_MODE_KEY) || 'client'; } catch(e){ sortMode = 'client'; }
 
   let storedSchemaVersion = 1;
   try { const sv = await storageGet(SCHEMA_KEY); storedSchemaVersion = sv ? parseInt(sv.value, 10) || 1 : 1; } catch(e){}
@@ -683,6 +731,21 @@ function renderWhoFilterChips(){
     document.getElementById('staffManageModalBackdrop').classList.add('open');
   });
   row.appendChild(manageChip);
+}
+function renderSortModeChips(){
+  const row = document.getElementById('sortModeRow');
+  row.innerHTML = '';
+  const label = document.createElement('span');
+  label.className = 'sort-label';
+  label.textContent = tr('labelSortBy');
+  row.appendChild(label);
+  [['client', tr('sortByClient')], ['status', tr('sortByStatus')], ['linkedClient', tr('sortByLinked')]].forEach(([v, txt]) => {
+    const chip = document.createElement('button');
+    chip.className = 'chip' + (sortMode === v ? ' sel' : '');
+    chip.textContent = txt;
+    chip.addEventListener('click', () => { sortMode = v; saveSortMode(); renderSortModeChips(); render(); });
+    row.appendChild(chip);
+  });
 }
 function renderStaffManageList(){
   const el = document.getElementById('staffManageList');
@@ -743,8 +806,13 @@ document.getElementById('addPersonSaveBtn').addEventListener('click', async () =
 document.getElementById('addPersonModalBackdrop').addEventListener('click', (e) => { if (e.target.id === 'addPersonModalBackdrop') e.target.classList.remove('open'); });
 
 // ---------- rendering ----------
-const typeOrder = ['BAS','Return','Other'];
-function typeLabel(type){ return type==='BAS' ? tr('typeBAS').split('(')[0].trim() : type==='Return' ? tr('typeReturn').split('(')[0].trim() : tr('typeOther'); }
+const typeOrder = ['BAS','Return','FBT','Other'];
+function typeLabel(type){
+  if (type==='BAS') return tr('typeBAS').split('(')[0].trim();
+  if (type==='Return') return tr('typeReturn').split('(')[0].trim();
+  if (type==='FBT') return tr('typeFBT').split('(')[0].trim();
+  return tr('typeOther');
+}
 
 function render(){
   const now = new Date();
@@ -770,6 +838,8 @@ function render(){
       const aActive = a.status !== 'not_started';
       const bActive = b.status !== 'not_started';
       if (aActive !== bActive) return aActive ? -1 : 1;
+      if (sortMode === 'status') return (a.workStatus || '\uffff').localeCompare(b.workStatus || '\uffff');
+      if (sortMode === 'linkedClient') return (a.linkedClient || '\uffff').localeCompare(b.linkedClient || '\uffff', 'zh');
       return a.client.localeCompare(b.client, 'zh');
     });
     const label = document.createElement('div');
@@ -894,6 +964,7 @@ function completeTask(id){
     client: t.client, type: t.type, period: t.period || '', who: t.who,
     createdAt: t.createdAt || null, completedAt: fmt(now), archivedAt: fmt(now),
     qStart: t.qStart || null, fyStartYear: (t.fyStartYear !== undefined ? t.fyStartYear : null),
+    fbtStartYear: (t.fbtStartYear !== undefined ? t.fbtStartYear : null),
     due: t.due || null, workStart: t.workStart || null, linkedClient: t.linkedClient || null, note: t.note || ''
   };
   archive.push(archEntry);
@@ -972,6 +1043,7 @@ function restoreFromArchive(id){
     client: a.client, type: a.type, who: a.who, status: 'pending',
     period: a.period || null, due: a.due || null, workStart: a.workStart || null,
     qStart: a.qStart || undefined, fyStartYear: (a.fyStartYear !== null && a.fyStartYear !== undefined ? a.fyStartYear : undefined),
+    fbtStartYear: (a.fbtStartYear !== null && a.fbtStartYear !== undefined ? a.fbtStartYear : undefined),
     linkedClient: a.linkedClient || null, note: a.note || '',
     createdAt: a.createdAt || fmt(new Date()), completedAt: null
   });
@@ -1118,7 +1190,9 @@ function updateFieldVisibility(){
   document.getElementById('f-quarter-wrap').style.display = (newType === 'BAS') ? '' : 'none';
   document.getElementById('f-other-wrap').style.display = (newType === 'Other') ? '' : 'none';
   document.getElementById('f-fy-wrap').style.display = (newType === 'Return') ? '' : 'none';
+  document.getElementById('f-fbt-wrap').style.display = (newType === 'FBT') ? '' : 'none';
   document.getElementById('fyError').style.display = 'none';
+  document.getElementById('fbtError').style.display = 'none';
   if (newType === 'BAS'){
     const now = new Date();
     const qStart = calendarQuarterStart(now);
@@ -1129,6 +1203,11 @@ function updateFieldVisibility(){
     const fy = currentFYStartYear(new Date()) - 1;
     document.getElementById('f-fy-start').value = shortY(fy);
     document.getElementById('f-fy-end').value = shortY(fy+1);
+  }
+  if (newType === 'FBT'){
+    const fbtStart = currentFBTStartYear(new Date()) - 1;
+    document.getElementById('f-fbt-start').value = shortY(fbtStart);
+    document.getElementById('f-fbt-end').value = shortY(fbtStart+1);
   }
 }
 document.getElementById('addBtn').addEventListener('click', () => {
@@ -1158,7 +1237,9 @@ document.getElementById('saveBtn').addEventListener('click', async () => {
 
   const now = new Date();
   const fyErrorEl = document.getElementById('fyError');
+  const fbtErrorEl = document.getElementById('fbtError');
   fyErrorEl.style.display = 'none';
+  fbtErrorEl.style.display = 'none';
   let p;
   if (newType === 'Return'){
     const startRaw = parseInt(document.getElementById('f-fy-start').value, 10);
@@ -1174,6 +1255,20 @@ document.getElementById('saveBtn').addEventListener('click', async () => {
     const r = returnFieldsFromFYStart(fyStart);
     const started = now >= r.workStart;
     p = { period: r.label, fyStartYear: fyStart, due: null, workStart: fmt(r.workStart), status: started ? 'pending' : 'not_started' };
+  } else if (newType === 'FBT'){
+    const startRaw = parseInt(document.getElementById('f-fbt-start').value, 10);
+    const endRaw = parseInt(document.getElementById('f-fbt-end').value, 10);
+    if (isNaN(startRaw) || isNaN(endRaw)){ showToast(tr('toastNeedFY')); return; }
+    const fbtStart = normalizeYear(startRaw);
+    const fbtEnd = normalizeYear(endRaw);
+    if (fbtEnd - fbtStart !== 1){
+      fbtErrorEl.textContent = tr('fyErrorMsg');
+      fbtErrorEl.style.display = '';
+      return;
+    }
+    const f = fbtFieldsFromStart(fbtStart);
+    const started = now >= f.workStart;
+    p = { period: f.label, fbtStartYear: fbtStart, due: fmt(f.due), workStart: fmt(f.workStart), status: started ? 'pending' : 'not_started' };
   } else if (newType === 'BAS'){
     const qMonth = parseInt(document.getElementById('f-quarter-select').value, 10);
     const qYearRaw = parseInt(document.getElementById('f-quarter-year').value, 10);
@@ -1193,7 +1288,7 @@ document.getElementById('saveBtn').addEventListener('click', async () => {
     chainId: genChainId(),
     client, type: newType, who: newWho, status: p.status,
     period, due: p.due, workStart: p.workStart,
-    qStart: p.qStart, fyStartYear: p.fyStartYear,
+    qStart: p.qStart, fyStartYear: p.fyStartYear, fbtStartYear: p.fbtStartYear,
     linkedClient: linked || null, note: '',
     createdAt: fmt(now), completedAt: null
   });
@@ -1212,6 +1307,7 @@ document.querySelectorAll('.tab').forEach(tab => {
     const which = tab.dataset.tab;
     document.getElementById('activeSearchWrap').style.display = which==='active' ? '' : 'none';
     document.getElementById('whoFilterRow').style.display = which==='active' ? '' : 'none';
+    document.getElementById('sortModeRow').style.display = which==='active' ? '' : 'none';
     document.getElementById('activeView').style.display = which==='active' ? '' : 'none';
     document.getElementById('archiveView').style.display = which==='archive' ? '' : 'none';
     if (which==='archive') renderArchive(document.getElementById('archiveSearch').value);

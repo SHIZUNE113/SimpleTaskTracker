@@ -2,6 +2,18 @@
   "previous_url": "",
   "versions": [
     {
+      "version": "1.3.0",
+      "date": "2026-08-18",
+      "notes_zh": [
+        "🆕 新增FBT Return任务类型:固定周期01 April到31 March,截止日自动算成第二年6月25号,完成后自动续下一财年",
+        "🔀 进行中列表加了排序切换:客户名/状态/关联客户三选一,能开工的任务永远排最前面这条大原则不变,只是组内排序方式可以自己选了"
+      ],
+      "notes_en": [
+        "🆕 New FBT Return task type: fixed 1 April to 31 March period, due date auto-calculated as 25 June of the second year, auto-renews into the next FBT year on completion",
+        "🔀 Added a sort toggle to the active list: client name / status / linked client — actionable tasks still always float to the top, you just get to choose how each group is ordered within that"
+      ]
+    },
+    {
       "version": "1.2.1",
       "notes_zh": [
         "📋 进行中列表现在自动排序:能开工的任务(含已过期)排最上面,还没到开始时间的排最下面,同一组内再按客户名字母排",
