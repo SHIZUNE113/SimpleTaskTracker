@@ -9,7 +9,7 @@
   :root {
     --ink: #1c2733; --ink-soft: #4a5568; --paper: #f3f5f7; --paper-raised: #ffffff; --line: #d8dde3;
     --bas: #1f7a6c; --bas-bg: #e6f2ef; --ret: #a8641a; --ret-bg: #fbeee0; --oth: #5b4b9e; --oth-bg: #ede9f7;
-    --fbt: #1a5f8c; --fbt-bg: #e3eef5;
+    --fbt: #1a5f8c; --fbt-bg: #e3eef5; --misc: #8c1a5f; --misc-bg: #f5e3ee;
     --danger: #b03a2e; --danger-bg: #fbe9e6; --ok: #2e7d46;
   }
   * { box-sizing: border-box; }
@@ -45,6 +45,7 @@
   .update-version-group { margin-bottom: 12px; }
   .update-version-group:last-child { margin-bottom: 0; }
   .update-version-tag { font-size: 12px; font-weight: 700; color: var(--ink); margin-bottom: 3px; }
+  .warn-heading { font-size: 30px; font-weight: 900; color: var(--danger); letter-spacing: 0.04em; text-align: center; margin-bottom: 10px; }
   .update-version-date { font-size: 11px; font-weight: 500; color: var(--ink-soft); }
   .update-version-group ul { font-size: 13px; color: var(--ink-soft); line-height: 1.6; padding-left: 18px; margin: 0; }
   .type-badge { display: inline-block; font-size: 10.5px; font-weight: 700; padding: 2px 7px; border-radius: 20px; letter-spacing: 0.02em; }
@@ -52,6 +53,7 @@
   .type-Return { background: var(--ret-bg); color: var(--ret); }
   .type-Other { background: var(--oth-bg); color: var(--oth); }
   .type-FBT { background: var(--fbt-bg); color: var(--fbt); }
+  .type-Misc { background: var(--misc-bg); color: var(--misc); }
   .sort-label { font-size: 11px; color: var(--ink-soft); font-weight: 600; padding: 7px 2px; align-self: center; }
 
   .task-row { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
@@ -188,6 +190,7 @@
         <button data-v="BAS" class="sel" data-i18n="typeBAS">BAS(季度)</button>
         <button data-v="Return" data-i18n="typeReturn">Return(年度)</button>
         <button data-v="FBT" data-i18n="typeFBT">FBT(年度)</button>
+        <button data-v="Misc" data-i18n="typeMisc">Misc(年度)</button>
         <button data-v="Other" data-i18n="typeOther">其他</button>
       </div>
     </div>
@@ -226,6 +229,22 @@
         <span style="font-size:13px;font-weight:600;color:var(--ink-soft);">FY</span>
       </div>
       <div id="fbtError" style="color:var(--danger);font-size:12px;margin-top:5px;display:none;"></div>
+    </div>
+    <div class="field" id="f-misc-wrap" style="display:none;">
+      <label data-i18n="labelMiscType">类型</label>
+      <div class="seg" id="f-misc-subtype" style="margin-bottom:10px;">
+        <button data-v="STP" class="sel">STP</button>
+        <button data-v="TPAR">TPAR</button>
+      </div>
+      <label data-i18n="labelFY">选择财年</label>
+      <div style="display:flex;align-items:center;gap:6px;">
+        <span style="font-size:13px;font-weight:600;color:var(--ink-soft);">FY</span>
+        <input type="number" id="f-misc-start" style="width:64px;" placeholder="25">
+        <span style="font-size:13px;font-weight:600;color:var(--ink-soft);" data-i18n="fyTo">to</span>
+        <span style="font-size:13px;font-weight:600;color:var(--ink-soft);">FY</span>
+        <input type="number" id="f-misc-end" style="width:64px;" placeholder="26">
+      </div>
+      <div id="miscError" style="color:var(--danger);font-size:12px;margin-top:5px;display:none;"></div>
     </div>
     <div class="field" id="f-other-wrap" style="display:none;">
       <label data-i18n="labelOtherDesc">任务描述</label>
@@ -315,6 +334,18 @@
   </div>
 </div>
 
+<div class="modal-backdrop" id="backupWarnModalBackdrop">
+  <div class="modal">
+    <div class="warn-heading">⚠️ WARNING</div>
+    <p id="backupWarnBody" style="font-size:14px;font-weight:600;color:var(--ink);"></p>
+    <p style="font-size:12.5px;" data-i18n="backupWarnSub">数据只存在这台电脑的这个浏览器里,清缓存或换设备就会全部消失喵</p>
+    <div class="modal-actions">
+      <button class="btn-cancel" id="backupWarnLaterBtn" data-i18n="backupWarnLater">之后再说</button>
+      <button class="btn-save" id="backupWarnExportBtn" data-i18n="backupWarnExport">立即备份</button>
+    </div>
+  </div>
+</div>
+
 <div class="toast" id="toast"></div>
 <div class="undo-bar" id="undoBar">
   <span id="undoMsg" data-i18n="undoMsg">已完成并归档</span>
@@ -332,10 +363,11 @@ const LAST_SEEN_VERSION_KEY = 'last-seen-app-version-v1';
 const LAST_RUN_VERSION_KEY = 'last-run-app-version-v1';
 const SNAPSHOT_PREFIX = 'auto-snapshot-v1:';
 let pendingUpdateVersion = null;
+let updateModalShowing = false;
 // Bump APP_VERSION on every release. Point VERSION_CHECK_URL at a version.json file hosted
 // alongside this html (e.g. on GitHub Pages) once you set that up - leave it blank to disable
 // the update-check entirely (the app works fine either way).
-const APP_VERSION = '1.3.0';
+const APP_VERSION = '1.4.0';
 const VERSION_CHECK_URL = 'https://shizune113.github.io/SimpleTaskTracker/version.json';
 
 // DATA_VERSION is separate from APP_VERSION: bump this only when the *shape* of saved data
@@ -401,7 +433,8 @@ const I18N = {
     sortTime: '按时间', sortClient: '按客户',
     modalAddTitle: '新增任务', labelClient: '客户名', placeholderClient: '例如 ABC Pty Ltd',
     labelLinked: '关联客户', labelLinkedName: '关联客户名', placeholderLinkedName: '例如 ABC Holdings Pty Ltd',
-    labelType: '任务类型', typeBAS: 'BAS(季度)', typeReturn: 'Return(年度)', typeFBT: 'FBT(年度)', typeOther: '其他',
+    labelType: '任务类型', typeBAS: 'BAS(季度)', typeReturn: 'Return(年度)', typeFBT: 'FBT(年度)', typeMisc: 'Misc(年度)', typeOther: '其他',
+    labelMiscType: '类型',
     labelFBT: 'FBT财年',
     labelSortBy: '排序:', sortByClient: '客户名', sortByStatus: '状态', sortByLinked: '关联客户',
     labelQuarter: '选择季度', qPrev: '上季度', qCurrent: '本季度', qNext: '下季度',
@@ -429,6 +462,8 @@ const I18N = {
     updateBackupWarning: '强烈建议先导出一份备份,谨防意外', updateBackupBtn: '导出备份', updateBackedUp: '已备份 ✓',
     updateRollbackLinkText: '如果新版本有问题,点此回到上一版本',
     backupReminder: '距上次备份 {days} 天了,建议导出一份', backupReminderNever: '还没有导出过备份,建议现在导出一份',
+    backupWarnTitle: '已经 {days} 天没有备份了喵!!强烈建议现在导出一份!!', backupWarnNever: '你还从来没有导出过备份喵!!强烈建议现在导出一份!!',
+    backupWarnSub: '数据只存在这台电脑的这个浏览器里,清缓存或换设备就会全部消失喵', backupWarnLater: '之后再说', backupWarnExport: '立即备份',
     dataWarning: '⚠️ 数据<strong>只</strong>存在<strong>当前这台电脑的这个浏览器</strong>里——换浏览器、换电脑、清理浏览器缓存/记录都会导致列表消失,请养成定期导出备份的习惯',
     deleteConfirmTitle: '删除任务', deleteConfirmBodyTpl: '确定要删除「{client} — {period}」吗?之后自动生成的后续任务也不会再出现了。',
     btnDelete: '删除'
@@ -439,7 +474,8 @@ const I18N = {
     sortTime: 'By time', sortClient: 'By client',
     modalAddTitle: 'New Task', labelClient: 'Client name', placeholderClient: 'e.g. ABC Pty Ltd',
     labelLinked: 'Linked client', labelLinkedName: 'Linked client name', placeholderLinkedName: 'e.g. ABC Holdings Pty Ltd',
-    labelType: 'Task type', typeBAS: 'BAS (Quarterly)', typeReturn: 'Return (Annual)', typeFBT: 'FBT (Annual)', typeOther: 'Other',
+    labelType: 'Task type', typeBAS: 'BAS (Quarterly)', typeReturn: 'Return (Annual)', typeFBT: 'FBT (Annual)', typeMisc: 'Misc (Annual)', typeOther: 'Other',
+    labelMiscType: 'Report type',
     labelFBT: 'FBT year',
     labelSortBy: 'Sort:', sortByClient: 'Client name', sortByStatus: 'Status', sortByLinked: 'Linked client',
     labelQuarter: 'Select quarter', qPrev: 'Last quarter', qCurrent: 'This quarter', qNext: 'Next quarter',
@@ -467,6 +503,8 @@ const I18N = {
     updateBackupWarning: 'Strongly recommended: export a backup first, just in case', updateBackupBtn: 'Export backup', updateBackedUp: 'Backed up ✓',
     updateRollbackLinkText: 'If the new version has issues, click here to go back to the previous one',
     backupReminder: "It's been {days} days since your last backup — worth exporting one", backupReminderNever: "You haven't exported a backup yet — worth doing one now",
+    backupWarnTitle: "It's been {days} days since your last backup! Please export one now!", backupWarnNever: "You've never exported a backup! Please export one now!",
+    backupWarnSub: 'Your data lives only in this browser on this computer — clearing browser data or switching devices wipes it all.', backupWarnLater: 'Later', backupWarnExport: 'Back up now',
     dataWarning: '⚠️ Your data lives <strong>ONLY</strong> in <strong>THIS</strong> browser on <strong>THIS</strong> computer — switching browsers/computers or clearing browser data will wipe the list. Export backups regularly!',
     deleteConfirmTitle: 'Delete task', deleteConfirmBodyTpl: 'Delete "{client} — {period}"? Any future auto-generated follow-up tasks will also stop appearing.',
     btnDelete: 'Delete'
@@ -485,7 +523,7 @@ function checkBackupReminder(){
     return;
   }
   const days = Math.floor((Date.now() - Number(lastExport)) / 86400000);
-  if (days >= 7){
+  if (days >= 5){
     bar.textContent = tr('backupReminder').replace('{days}', days);
     bar.style.display = '';
   } else {
@@ -532,6 +570,15 @@ function fbtFieldsFromStart(fbtStart){
   return { label: `Apr${shortY(fbtStart)}-Mar${shortY(fbtEnd)}`, workStart, due };
 }
 function normalizeYear(v){ return v < 100 ? 2000 + v : v; }
+// Misc annual lodgments (STP finalisation + TPAR). Both run on the standard 1 Jul - 30 Jun
+// financial year and become workable once that year closes, but their due dates differ:
+// STP finalisation is due 14 Jul, TPAR is due 28 Aug - both in the year the FY ends.
+function miscFieldsFromFYStart(fy, subtype){
+  const endYear = fy + 1;
+  const workStart = new Date(endYear, 6, 1); // 1 Jul of the closing year
+  const due = subtype === 'STP' ? new Date(endYear, 6, 14) : new Date(endYear, 7, 28);
+  return { label: `${subtype} FY${shortY(fy)}-${shortY(endYear)}`, workStart, due };
+}
 function computeNewTaskPeriod(type, now, quarterOffset){
   if (type === 'BAS'){
     const qStart = shiftMonths(calendarQuarterStart(now), (quarterOffset||0)*3);
@@ -544,6 +591,12 @@ function computeNewTaskPeriod(type, now, quarterOffset){
     const r = returnFieldsFromFYStart(fy);
     const started = now >= r.workStart;
     return { period: r.label, fyStartYear: fy, due: null, workStart: fmt(r.workStart), status: started ? 'pending' : 'not_started' };
+  }
+  if (type === 'Misc'){
+    const fy = currentFYStartYear(now) - 1;
+    const m = miscFieldsFromFYStart(fy, 'STP');
+    const started = now >= m.workStart;
+    return { period: m.label, miscStartYear: fy, miscSubtype: 'STP', due: fmt(m.due), workStart: fmt(m.workStart), status: started ? 'pending' : 'not_started' };
   }
   if (type === 'FBT'){
     const fbtStart = currentFBTStartYear(now) - 1;
@@ -572,6 +625,13 @@ function buildNextTask(t, now){
     const f = fbtFieldsFromStart(nextFbtStart);
     const started = now >= f.workStart;
     return { ...base, status: started ? 'pending' : 'not_started', period: f.label, fbtStartYear: nextFbtStart, due: fmt(f.due), workStart: fmt(f.workStart) };
+  }
+  if (t.type === 'Misc'){
+    const nextFY = (t.miscStartYear !== undefined ? t.miscStartYear : currentFYStartYear(now)-1) + 1;
+    const sub = t.miscSubtype || 'TPAR';
+    const m = miscFieldsFromFYStart(nextFY, sub);
+    const started = now >= m.workStart;
+    return { ...base, status: started ? 'pending' : 'not_started', period: m.label, miscStartYear: nextFY, miscSubtype: sub, due: fmt(m.due), workStart: fmt(m.workStart) };
   }
   const nextFY = (t.fyStartYear !== undefined ? t.fyStartYear : currentFYStartYear(now)-1) + 1;
   const r = returnFieldsFromFYStart(nextFY);
@@ -642,7 +702,7 @@ function normalizeTask(t){
     id: t.id || ('t'+Date.now()+Math.random().toString(36).slice(2,7)),
     chainId: t.chainId || null,
     client: t.client || '',
-    type: (t.type === 'BAS' || t.type === 'Return' || t.type === 'FBT' || t.type === 'Other') ? t.type : 'Other',
+    type: (t.type === 'BAS' || t.type === 'Return' || t.type === 'FBT' || t.type === 'Misc' || t.type === 'Other') ? t.type : 'Other',
     who: t.who || '我',
     status: (t.status === 'not_started') ? 'not_started' : 'pending',
     period: t.period || null,
@@ -651,6 +711,8 @@ function normalizeTask(t){
     qStart: t.qStart,
     fyStartYear: t.fyStartYear,
     fbtStartYear: t.fbtStartYear,
+    miscStartYear: t.miscStartYear,
+    miscSubtype: t.miscSubtype,
     linkedClient: t.linkedClient || null,
     note: t.note || '',
     workStatus: t.workStatus || '',
@@ -667,6 +729,8 @@ function normalizeArchiveEntry(a){
     createdAt: a.createdAt || null, completedAt: a.completedAt || null, archivedAt: a.archivedAt || fmt(new Date()),
     qStart: a.qStart || null, fyStartYear: (a.fyStartYear !== undefined ? a.fyStartYear : null),
     fbtStartYear: (a.fbtStartYear !== undefined ? a.fbtStartYear : null),
+    miscStartYear: (a.miscStartYear !== undefined ? a.miscStartYear : null),
+    miscSubtype: a.miscSubtype || null,
     due: a.due || null, workStart: a.workStart || null, linkedClient: a.linkedClient || null, note: a.note || ''
   };
 }
@@ -806,11 +870,12 @@ document.getElementById('addPersonSaveBtn').addEventListener('click', async () =
 document.getElementById('addPersonModalBackdrop').addEventListener('click', (e) => { if (e.target.id === 'addPersonModalBackdrop') e.target.classList.remove('open'); });
 
 // ---------- rendering ----------
-const typeOrder = ['BAS','Return','FBT','Other'];
+const typeOrder = ['BAS','Return','FBT','Misc','Other'];
 function typeLabel(type){
   if (type==='BAS') return tr('typeBAS').split('(')[0].trim();
   if (type==='Return') return tr('typeReturn').split('(')[0].trim();
   if (type==='FBT') return tr('typeFBT').split('(')[0].trim();
+  if (type==='Misc') return tr('typeMisc').split('(')[0].trim();
   return tr('typeOther');
 }
 
@@ -965,6 +1030,7 @@ function completeTask(id){
     createdAt: t.createdAt || null, completedAt: fmt(now), archivedAt: fmt(now),
     qStart: t.qStart || null, fyStartYear: (t.fyStartYear !== undefined ? t.fyStartYear : null),
     fbtStartYear: (t.fbtStartYear !== undefined ? t.fbtStartYear : null),
+    miscStartYear: (t.miscStartYear !== undefined ? t.miscStartYear : null), miscSubtype: t.miscSubtype || null,
     due: t.due || null, workStart: t.workStart || null, linkedClient: t.linkedClient || null, note: t.note || ''
   };
   archive.push(archEntry);
@@ -1044,6 +1110,8 @@ function restoreFromArchive(id){
     period: a.period || null, due: a.due || null, workStart: a.workStart || null,
     qStart: a.qStart || undefined, fyStartYear: (a.fyStartYear !== null && a.fyStartYear !== undefined ? a.fyStartYear : undefined),
     fbtStartYear: (a.fbtStartYear !== null && a.fbtStartYear !== undefined ? a.fbtStartYear : undefined),
+    miscStartYear: (a.miscStartYear !== null && a.miscStartYear !== undefined ? a.miscStartYear : undefined),
+    miscSubtype: a.miscSubtype || undefined,
     linkedClient: a.linkedClient || null, note: a.note || '',
     createdAt: a.createdAt || fmt(new Date()), completedAt: null
   });
@@ -1186,11 +1254,14 @@ document.getElementById('importFile').addEventListener('change', (e) => {
 
 // ---------- add task modal ----------
 let newType = 'BAS';
+let newMiscSubtype = 'STP';
 function updateFieldVisibility(){
   document.getElementById('f-quarter-wrap').style.display = (newType === 'BAS') ? '' : 'none';
   document.getElementById('f-other-wrap').style.display = (newType === 'Other') ? '' : 'none';
   document.getElementById('f-fy-wrap').style.display = (newType === 'Return') ? '' : 'none';
   document.getElementById('f-fbt-wrap').style.display = (newType === 'FBT') ? '' : 'none';
+  document.getElementById('f-misc-wrap').style.display = (newType === 'Misc') ? '' : 'none';
+  document.getElementById('miscError').style.display = 'none';
   document.getElementById('fyError').style.display = 'none';
   document.getElementById('fbtError').style.display = 'none';
   if (newType === 'BAS'){
@@ -1209,6 +1280,11 @@ function updateFieldVisibility(){
     document.getElementById('f-fbt-start').value = shortY(fbtStart);
     document.getElementById('f-fbt-end').value = shortY(fbtStart+1);
   }
+  if (newType === 'Misc'){
+    const fy = currentFYStartYear(new Date()) - 1;
+    document.getElementById('f-misc-start').value = shortY(fy);
+    document.getElementById('f-misc-end').value = shortY(fy+1);
+  }
 }
 document.getElementById('addBtn').addEventListener('click', () => {
   document.getElementById('f-client').value = '';
@@ -1216,7 +1292,8 @@ document.getElementById('addBtn').addEventListener('click', () => {
   document.getElementById('f-linked-check').checked = false;
   document.getElementById('f-linked-name').value = '';
   document.getElementById('f-linked-wrap').style.display = 'none';
-  newType = 'BAS'; newWho = '我';
+  newType = 'BAS'; newWho = '我'; newMiscSubtype = 'STP';
+  [...document.getElementById('f-misc-subtype').children].forEach(b => b.classList.toggle('sel', b.dataset.v==='STP'));
   [...document.getElementById('f-type').children].forEach(b => b.classList.toggle('sel', b.dataset.v==='BAS'));
   renderWhoModalChips();
   updateFieldVisibility();
@@ -1229,6 +1306,11 @@ document.getElementById('f-type').addEventListener('click', (e) => {
   newType = btn.dataset.v;
   [...document.getElementById('f-type').children].forEach(b => b.classList.toggle('sel', b===btn));
   updateFieldVisibility();
+});
+document.getElementById('f-misc-subtype').addEventListener('click', (e) => {
+  const btn = e.target.closest('button'); if (!btn) return;
+  newMiscSubtype = btn.dataset.v;
+  [...document.getElementById('f-misc-subtype').children].forEach(b => b.classList.toggle('sel', b===btn));
 });
 document.getElementById('saveBtn').addEventListener('click', async () => {
   const client = document.getElementById('f-client').value.trim();
@@ -1269,6 +1351,21 @@ document.getElementById('saveBtn').addEventListener('click', async () => {
     const f = fbtFieldsFromStart(fbtStart);
     const started = now >= f.workStart;
     p = { period: f.label, fbtStartYear: fbtStart, due: fmt(f.due), workStart: fmt(f.workStart), status: started ? 'pending' : 'not_started' };
+  } else if (newType === 'Misc'){
+    const startRaw = parseInt(document.getElementById('f-misc-start').value, 10);
+    const endRaw = parseInt(document.getElementById('f-misc-end').value, 10);
+    const miscErrorEl = document.getElementById('miscError');
+    if (isNaN(startRaw) || isNaN(endRaw)){ showToast(tr('toastNeedFY')); return; }
+    const mStart = normalizeYear(startRaw);
+    const mEnd = normalizeYear(endRaw);
+    if (mEnd - mStart !== 1){
+      miscErrorEl.textContent = tr('fyErrorMsg');
+      miscErrorEl.style.display = '';
+      return;
+    }
+    const m = miscFieldsFromFYStart(mStart, newMiscSubtype);
+    const started = now >= m.workStart;
+    p = { period: m.label, miscStartYear: mStart, miscSubtype: newMiscSubtype, due: fmt(m.due), workStart: fmt(m.workStart), status: started ? 'pending' : 'not_started' };
   } else if (newType === 'BAS'){
     const qMonth = parseInt(document.getElementById('f-quarter-select').value, 10);
     const qYearRaw = parseInt(document.getElementById('f-quarter-year').value, 10);
@@ -1289,6 +1386,7 @@ document.getElementById('saveBtn').addEventListener('click', async () => {
     client, type: newType, who: newWho, status: p.status,
     period, due: p.due, workStart: p.workStart,
     qStart: p.qStart, fyStartYear: p.fyStartYear, fbtStartYear: p.fbtStartYear,
+    miscStartYear: p.miscStartYear, miscSubtype: p.miscSubtype,
     linkedClient: linked || null, note: '',
     createdAt: fmt(now), completedAt: null
   });
@@ -1323,6 +1421,37 @@ document.getElementById('archiveSort').addEventListener('click', (e) => {
 });
 
 // ---------- update check ----------
+// ---------- backup warning modal ----------
+// Shown on load when it has been >=5 days (or never) since the last export. Deliberately
+// sequenced to appear AFTER the update popup so it can't be mistaken for the patch notes
+// and dismissed on autopilot.
+function backupOverdueDays(){
+  if (tasks.length === 0 && archive.length === 0) return null;
+  let lastExport = null;
+  try { lastExport = localStorage.getItem(LAST_EXPORT_KEY); } catch(e){}
+  if (!lastExport) return 'never';
+  const days = Math.floor((Date.now() - Number(lastExport)) / 86400000);
+  return days >= 5 ? days : null;
+}
+function maybeShowBackupWarning(){
+  const overdue = backupOverdueDays();
+  if (overdue === null) return;
+  document.getElementById('backupWarnBody').textContent = (overdue === 'never')
+    ? tr('backupWarnNever')
+    : tr('backupWarnTitle').replace('{days}', overdue);
+  document.getElementById('backupWarnModalBackdrop').classList.add('open');
+}
+function closeBackupWarn(){ document.getElementById('backupWarnModalBackdrop').classList.remove('open'); }
+document.getElementById('backupWarnLaterBtn').addEventListener('click', closeBackupWarn);
+document.getElementById('backupWarnExportBtn').addEventListener('click', () => {
+  try { exportBackup(); showToast(tr('toastExported')); }
+  catch(err){ showToast(tr('toastSaveFail')); }
+  closeBackupWarn();
+});
+document.getElementById('backupWarnModalBackdrop').addEventListener('click', (e) => {
+  if (e.target.id === 'backupWarnModalBackdrop') closeBackupWarn();
+});
+
 function buildNotesGroupsHtml(missedVersions){
   return missedVersions.map(v => {
     const notes = (currentLang === 'zh' ? v.notes_zh : v.notes_en) || v.notes_zh || v.notes_en || [];
@@ -1334,13 +1463,13 @@ function buildNotesGroupsHtml(missedVersions){
   }).join('');
 }
 async function checkForUpdate(){
-  if (!VERSION_CHECK_URL) return;
+  if (!VERSION_CHECK_URL){ maybeShowBackupWarning(); return; }
   try {
     const res = await fetch(VERSION_CHECK_URL + (VERSION_CHECK_URL.includes('?') ? '&' : '?') + 't=' + Date.now(), { cache: 'no-store' });
-    if (!res.ok) return;
+    if (!res.ok){ maybeShowBackupWarning(); return; }
     const data = await res.json();
     const versions = data && Array.isArray(data.versions) ? data.versions : null;
-    if (!versions || versions.length === 0 || !versions[0].version) return;
+    if (!versions || versions.length === 0 || !versions[0].version){ maybeShowBackupWarning(); return; }
     const latestVersion = versions[0].version;
 
     let lastSeen = null;
@@ -1350,15 +1479,16 @@ async function checkForUpdate(){
       // genuine first-ever open on this browser - nothing to "update" from, so just
       // silently baseline to the current version without showing a popup.
       try { localStorage.setItem(LAST_SEEN_VERSION_KEY, latestVersion); } catch(e){}
+      maybeShowBackupWarning();
       return;
     }
-    if (lastSeen === latestVersion) return; // this browser has already acknowledged the latest version
+    if (lastSeen === latestVersion){ maybeShowBackupWarning(); return; } // already acknowledged
 
     // Show notes for EVERY version newer than what this browser last saw, not just the
     // latest - so skipping several releases still surfaces everything that changed.
     const idx = versions.findIndex(v => v.version === lastSeen);
     const missed = idx === -1 ? versions : versions.slice(0, idx);
-    if (missed.length === 0) return;
+    if (missed.length === 0){ maybeShowBackupWarning(); return; }
 
     pendingUpdateVersion = latestVersion;
     document.getElementById('updateVersionText').textContent = latestVersion;
@@ -1381,8 +1511,11 @@ async function checkForUpdate(){
       rollbackWrap.style.display = 'none';
     }
 
+    updateModalShowing = true;
     document.getElementById('updateModalBackdrop').classList.add('open');
+    return;
   } catch(e) { /* offline or host unreachable - fail silently, this is a non-essential nicety */ }
+  maybeShowBackupWarning();
 }
 document.getElementById('updateBackupBtn').addEventListener('click', () => {
   const reloadBtn = document.getElementById('updateReloadBtn');
@@ -1399,15 +1532,19 @@ document.getElementById('updateBackupBtn').addEventListener('click', () => {
   reloadBtn.style.cursor = 'pointer';
   document.getElementById('updateBackupBtn').textContent = tr('updateBackedUp');
 });
-document.getElementById('updateDismissBtn').addEventListener('click', () => document.getElementById('updateModalBackdrop').classList.remove('open'));
+function dismissUpdateModal(){
+  document.getElementById('updateModalBackdrop').classList.remove('open');
+  if (updateModalShowing){ updateModalShowing = false; maybeShowBackupWarning(); }
+}
+document.getElementById('updateDismissBtn').addEventListener('click', dismissUpdateModal);
 document.getElementById('updateReloadBtn').addEventListener('click', (e) => {
   if (e.target.disabled) return;
   if (pendingUpdateVersion){
     try { localStorage.setItem(LAST_SEEN_VERSION_KEY, pendingUpdateVersion); } catch(err){}
   }
-  document.getElementById('updateModalBackdrop').classList.remove('open');
+  dismissUpdateModal();
 });
-document.getElementById('updateModalBackdrop').addEventListener('click', (e) => { if (e.target.id === 'updateModalBackdrop') e.target.classList.remove('open'); });
+document.getElementById('updateModalBackdrop').addEventListener('click', (e) => { if (e.target.id === 'updateModalBackdrop') dismissUpdateModal(); });
 
 // ---------- crash recovery: if anything above throws, never leave a blank page -
 // show a minimal standalone screen that still lets the person export their raw data ----------

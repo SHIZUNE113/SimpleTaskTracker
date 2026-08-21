@@ -2,6 +2,22 @@
   "previous_url": "",
   "versions": [
     {
+      "version": "1.4.0",
+      "date": "2026-08-18",
+      "notes_zh": [
+        "🆕 新增 Misc (Annual) 任务类型:选好STP还是TPAR,再填财年就行,两者都归在同一个Misc分类下,可以一起折叠",
+        "📅 截止日各算各的:TPAR是财年结束那年的8月28,STP finalisation是7月14(查过ATO官方,STP不是8月28那个日子喵)",
+        "🚨 备份提醒升级:超过5天没备份的话,一打开就会弹一个大红WARNING窗口,带一键备份按钮(顶部黄条也一起从7天改成5天)",
+        "📌 这个警告会排在更新公告之后单独弹,免得你顺手当成patch note关掉喵"
+      ],
+      "notes_en": [
+        "🆕 New Misc (Annual) task type: pick STP or TPAR, enter the financial year, and both file under a single collapsible Misc section",
+        "📅 Separate due dates: TPAR is 28 August of the closing year, STP finalisation is 14 July (checked against the ATO — STP isn't the 28 Aug date)",
+        "🚨 Backup nagging upgraded: go 5+ days without a backup and you'll get a big red WARNING popup on open, with a one-click backup button (the yellow banner moved from 7 days to 5 too)",
+        "📌 It deliberately queues AFTER the patch notes so you can't dismiss it on autopilot thinking it's just the changelog"
+      ]
+    },
+    {
       "version": "1.3.0",
       "date": "2026-08-18",
       "notes_zh": [
