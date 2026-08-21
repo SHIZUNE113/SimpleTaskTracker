@@ -45,6 +45,14 @@
   .update-version-group { margin-bottom: 12px; }
   .update-version-group:last-child { margin-bottom: 0; }
   .update-version-tag { font-size: 12px; font-weight: 700; color: var(--ink); margin-bottom: 3px; }
+  .mascot {
+    position: fixed; bottom: 0; right: 0; width: 200px; height: 200px;
+    object-fit: contain; pointer-events: none; z-index: 5; opacity: 0.85;
+    border-radius: 16px 0 0 0; transition: opacity .3s ease;
+  }
+  .mascot.dim { opacity: 0.10; }
+  @media (max-width: 560px) { .mascot { width: 130px; height: 130px; } }
+  .fab { z-index: 30; }
   .warn-heading { font-size: 30px; font-weight: 900; color: var(--danger); letter-spacing: 0.04em; text-align: center; margin-bottom: 10px; }
   .update-version-date { font-size: 11px; font-weight: 500; color: var(--ink-soft); }
   .update-version-group ul { font-size: 13px; color: var(--ink-soft); line-height: 1.6; padding-left: 18px; margin: 0; }
@@ -166,6 +174,8 @@
   <div class="footer-credit" data-i18n="footerCredit">本软件由猫猫幻雪与Claude共同完成喵o( •w• )o</div>
   <div class="footer-credit" id="footerVersion" style="margin-top:4px;"></div>
 </div>
+
+<video class="mascot" id="mascotVid" src="mascot.mp4" autoplay muted playsinline disablepictureinpicture preload="auto"></video>
 
 <button class="fab" id="addBtn">+</button>
 
@@ -1577,6 +1587,21 @@ function showCrashScreen(err){
     }
   } catch(e2){ /* if even the recovery screen fails, there's nothing more we can safely do client-side */ }
 }
+
+
+// ---------- mascot ----------
+// Fixed bottom-right, click-through (pointer-events:none), and fades out of the way while
+// the cursor is over its corner so it never hides the task underneath.
+(function initMascot(){
+  const m = document.getElementById('mascotVid');
+  if (!m) return;
+  m.addEventListener('ended', () => { m.pause(); }); // freeze on the final frame
+  document.addEventListener('mousemove', (e) => {
+    const r = m.getBoundingClientRect();
+    const near = e.clientX >= r.left - 20 && e.clientY >= r.top - 20;
+    m.classList.toggle('dim', near);
+  });
+})();
 
 // ---------- init ----------
 (async function init(){
