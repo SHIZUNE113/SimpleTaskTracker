@@ -79,7 +79,9 @@
   .card .meta { font-size: 12px; color: var(--ink-soft); display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin-top: 3px; }
   .card .period { font-variant-numeric: tabular-nums; }
   .created-tag { font-size: 10.5px; color: #9aa4af; }
-  .who { font-size: 11px; padding: 1px 6px; border-radius: 5px; background: #eef0f2; color: var(--ink-soft); font-weight: 600; }
+  .who { font-size: 11px; padding: 1px 6px; border-radius: 5px; background: #eef0f2; color: var(--ink-soft); font-weight: 600; cursor: pointer; border: 1px solid transparent; }
+  .who:hover { background: #e2e6ea; border-color: var(--line); }
+  .who .who-caret { font-size: 8px; opacity: 0.55; margin-left: 3px; }
   .due-tag { font-size: 11px; color: var(--danger); font-weight: 700; }
   .ns-tag { font-size: 11px; color: #7a8492; font-weight: 700; }
 
@@ -293,6 +295,18 @@
   </div>
 </div>
 
+<div class="modal-backdrop" id="reassignModalBackdrop">
+  <div class="modal">
+    <h2 data-i18n="reassignTitle">转移负责人</h2>
+    <p id="reassignSubtitle" style="color:var(--ink-soft);font-size:13px;margin:0 0 4px;"></p>
+    <p style="color:var(--ink-soft);font-size:12px;margin:0 0 10px;" data-i18n="reassignHint">会套用到这条任务链:当前任务和之后自动生成的每一期。历史记录保持原样。</p>
+    <div class="chip-row" id="reassignWhoChips"></div>
+    <div class="modal-actions">
+      <button class="btn-cancel" id="reassignCancelBtn" data-i18n="btnCancel">取消</button>
+    </div>
+  </div>
+</div>
+
 <div class="modal-backdrop" id="addPersonModalBackdrop">
   <div class="modal">
     <h2 data-i18n="addPersonModalTitle">新增负责人</h2>
@@ -377,7 +391,7 @@ let updateModalShowing = false;
 // Bump APP_VERSION on every release. Point VERSION_CHECK_URL at a version.json file hosted
 // alongside this html (e.g. on GitHub Pages) once you set that up - leave it blank to disable
 // the update-check entirely (the app works fine either way).
-const APP_VERSION = '1.4.0';
+const APP_VERSION = '1.5.0';
 const VERSION_CHECK_URL = 'https://shizune113.github.io/SimpleTaskTracker/version.json';
 
 // DATA_VERSION is separate from APP_VERSION: bump this only when the *shape* of saved data
@@ -466,6 +480,9 @@ const I18N = {
     toastRestoreAmbiguous: '已恢复,但发现有多个同类型任务,请手动检查一下有没有重复喵',
     personMe: '我', filterAll: '全部',
     addPersonModalTitle: '新增负责人', placeholderPersonName: '输入名字',
+    reassignTitle: '转移负责人',
+    reassignHint: '会套用到这条任务链:当前任务和之后自动生成的每一期。历史记录保持原样。',
+    toastReassigned: '已转给 {name}', toastReassignSame: '本来就是这个人喵',
     manageStaffTitle: '管理负责人', emptyStaff: '还没有添加负责人',
     footerCredit: '本软件由猫猫幻雪与Claude共同完成喵o( •w• )o',
     updateAvailableTitle: '有新版本喵!', updateVersionLabel: '版本', updateLater: '稍后', updateReload: '知道了',
@@ -507,6 +524,9 @@ const I18N = {
     toastRestoreAmbiguous: 'Restored, but found multiple tasks of the same type — please check for duplicates manually',
     personMe: 'Me', filterAll: 'All',
     addPersonModalTitle: 'Add assignee', placeholderPersonName: 'Enter a name',
+    reassignTitle: 'Reassign',
+    reassignHint: 'Applies to the whole chain: this task and every future period it spawns. Archive history is left as-is.',
+    toastReassigned: 'Reassigned to {name}', toastReassignSame: 'Already assigned to them',
     manageStaffTitle: 'Manage assignees', emptyStaff: 'No assignees added yet',
     footerCredit: 'Built by huanxue the cat & Claude o( •w• )o',
     updateAvailableTitle: 'New version available!', updateVersionLabel: 'Version', updateLater: 'Later', updateReload: 'Got it',
@@ -858,9 +878,12 @@ function renderWhoModalChips(){
   addChip.type = 'button';
   addChip.className = 'chip add-chip';
   addChip.textContent = '+';
-  addChip.addEventListener('click', openAddPersonModal);
+  addChip.addEventListener('click', () => { addPersonTarget = 'newTask'; openAddPersonModal(); });
   row.appendChild(addChip);
 }
+// The "add a person" modal is shared between the new-task picker and the reassign picker,
+// so remember which one opened it and hand the freshly created name back to that one only.
+let addPersonTarget = 'newTask'; // 'newTask' | 'reassign'
 function openAddPersonModal(){
   document.getElementById('newPersonName').value = '';
   document.getElementById('addPersonModalBackdrop').classList.add('open');
@@ -872,12 +895,90 @@ document.getElementById('addPersonSaveBtn').addEventListener('click', async () =
   if (allPeople().includes(name)){ showToast(tr('toastPersonExists')); return; }
   staffList.push(name);
   await saveStaffList();
-  newWho = name;
-  renderWhoModalChips();
   renderWhoFilterChips();
   document.getElementById('addPersonModalBackdrop').classList.remove('open');
+  if (addPersonTarget === 'reassign'){
+    // Creating a person from the reassign picker is only ever a step towards handing the
+    // chain to them, so apply it straight away rather than making them click the new chip.
+    await applyReassign(name);
+  } else {
+    newWho = name;
+    renderWhoModalChips();
+  }
 });
 document.getElementById('addPersonModalBackdrop').addEventListener('click', (e) => { if (e.target.id === 'addPersonModalBackdrop') e.target.classList.remove('open'); });
+
+// ---------- reassign a task chain to another person ----------
+// Reassignment is deliberately chain-wide, not per-task: the real-world trigger is a
+// colleague leaving or a client changing hands, and in that case every future period of
+// that client's BAS/Return/FBT/Misc should follow the new owner, not just the open one.
+// Future periods come along for free because buildNextTask() copies `who` from the task
+// being completed - so updating the live task is what steers everything downstream.
+// The archive is left ALONE on purpose: it is the record of who actually did each period,
+// and rewriting it would lose that. Instead, restoreFromArchive() inherits the assignee
+// from the live task it displaces (see chainWho there), so pulling an old period back into
+// the active list still lands on the current owner rather than the person who left.
+let reassignEditingId = null;
+function openReassignModal(id){
+  const t = tasks.find(x => x.id === id); if (!t) return;
+  reassignEditingId = id;
+  document.getElementById('reassignSubtitle').textContent = `${t.client} · ${t.period || typeLabel(t.type)}`;
+  renderReassignChips();
+  document.getElementById('reassignModalBackdrop').classList.add('open');
+}
+function renderReassignChips(){
+  const row = document.getElementById('reassignWhoChips');
+  const t = tasks.find(x => x.id === reassignEditingId);
+  row.innerHTML = '';
+  allPeople().forEach(p => {
+    const chip = document.createElement('button');
+    chip.type = 'button';
+    chip.className = 'chip' + (t && t.who === p ? ' sel' : '');
+    chip.textContent = personLabel(p);
+    chip.dataset.person = p;
+    chip.addEventListener('click', () => applyReassign(p));
+    row.appendChild(chip);
+  });
+  const addChip = document.createElement('button');
+  addChip.type = 'button';
+  addChip.className = 'chip add-chip';
+  addChip.textContent = '+';
+  addChip.addEventListener('click', () => { addPersonTarget = 'reassign'; openAddPersonModal(); });
+  row.appendChild(addChip);
+}
+async function applyReassign(name){
+  const t = tasks.find(x => x.id === reassignEditingId);
+  if (!t){ document.getElementById('reassignModalBackdrop').classList.remove('open'); return; }
+  if (t.who === name){
+    showToast(tr('toastReassignSame'));
+    document.getElementById('reassignModalBackdrop').classList.remove('open');
+    reassignEditingId = null;
+    return;
+  }
+  // 'Other' tasks are one-offs with no lineage, so they reassign alone.
+  if (t.type === 'Other'){
+    t.who = name;
+  } else {
+    tasks.forEach(x => { if (sameChain(t, x)) x.who = name; });
+    // Keep a pending 5s undo consistent: if the user completed a task, reassigned the
+    // freshly spawned successor, then hits undo, the task coming back into the ACTIVE list
+    // should carry the new assignee. Only the in-memory snapshot is touched - the archive
+    // entry itself stays as-is (and is discarded by the undo anyway).
+    if (lastAction && lastAction.originalTask && sameChain(t, lastAction.originalTask)){
+      lastAction.originalTask.who = name;
+    }
+  }
+  await saveTasks();
+  if (selectedWhoFilter !== null && selectedWhoFilter !== name) selectedWhoFilter = null;
+  renderWhoFilterChips();
+  document.getElementById('reassignModalBackdrop').classList.remove('open');
+  reassignEditingId = null;
+  render();
+  renderArchive(document.getElementById('archiveSearch').value);
+  showToast(tr('toastReassigned').replace('{name}', personLabel(name)));
+}
+document.getElementById('reassignCancelBtn').addEventListener('click', () => { document.getElementById('reassignModalBackdrop').classList.remove('open'); reassignEditingId = null; });
+document.getElementById('reassignModalBackdrop').addEventListener('click', (e) => { if (e.target.id === 'reassignModalBackdrop'){ e.target.classList.remove('open'); reassignEditingId = null; } });
 
 // ---------- rendering ----------
 const typeOrder = ['BAS','Return','FBT','Misc','Other'];
@@ -956,7 +1057,7 @@ function render(){
           <div class="meta">
             <span class="type-badge type-${t.type}">${typeLabel(t.type)}</span>
             ${periodText ? `<span class="period">${escapeHtml(periodText)}</span>` : ''}
-            <span class="who">${escapeHtml(personLabel(t.who))}</span>
+            <span class="who" data-reassign="${t.id}" title="${escapeHtml(tr('reassignTitle'))}">${escapeHtml(personLabel(t.who))}<span class="who-caret">▾</span></span>
             ${notStarted ? `<span class="ns-tag">${tr('tagNotStarted')}</span>` :
               overdue ? `<span class="due-tag">${tr('tagOverdue')}</span>` : (t.due ? `<span class="period">${tr('labelDue')} ${t.due}</span>` : '')}
             <span class="created-tag">${tr('labelCreated')} ${t.createdAt||'—'}</span>
@@ -977,6 +1078,7 @@ function render(){
         if (e.target.closest('.done-btn')) return;
         if (e.target.closest('.status-select')) return;
         if (e.target.closest('.client[data-client]')) return;
+        if (e.target.closest('.who[data-reassign]')) return;
         openTaskNoteModal(t.id);
       });
       row.appendChild(delBtn);
@@ -1002,6 +1104,9 @@ function render(){
   });
   container.querySelectorAll('.client[data-client]').forEach(el => {
     el.addEventListener('click', (e) => { e.stopPropagation(); openNoteModal(el.dataset.client); });
+  });
+  container.querySelectorAll('.who[data-reassign]').forEach(el => {
+    el.addEventListener('click', (e) => { e.stopPropagation(); openReassignModal(el.dataset.reassign); });
   });
 }
 
@@ -1104,9 +1209,16 @@ function restoreFromArchive(id){
   // If there's more than one match (e.g. a manually-added duplicate task for the same
   // client+type), don't guess which one to remove - leave both and flag it for a manual check.
   let ambiguousMatch = false;
+  // The archive keeps the historical assignee (who actually did that period), so restoring
+  // must not blindly resurrect it - after a staff handover that would hand the task back to
+  // the person who left. Inherit from the live task being displaced, which is the chain's
+  // current owner. With nothing live to inherit from (or an ambiguous match we refuse to
+  // guess at), fall back to what the archive recorded.
+  let chainWho = a.who;
   if (a.type !== 'Other'){
     const matches = tasks.filter(x => sameChain(a, x));
     if (matches.length === 1){
+      chainWho = matches[0].who || a.who;
       const ni = tasks.findIndex(x => sameChain(a, x));
       tasks.splice(ni, 1);
     } else if (matches.length > 1){
@@ -1116,7 +1228,7 @@ function restoreFromArchive(id){
   tasks.push({
     id: 't'+Date.now()+Math.random().toString(36).slice(2,7),
     chainId: a.chainId || null,
-    client: a.client, type: a.type, who: a.who, status: 'pending',
+    client: a.client, type: a.type, who: chainWho, status: 'pending',
     period: a.period || null, due: a.due || null, workStart: a.workStart || null,
     qStart: a.qStart || undefined, fyStartYear: (a.fyStartYear !== null && a.fyStartYear !== undefined ? a.fyStartYear : undefined),
     fbtStartYear: (a.fbtStartYear !== null && a.fbtStartYear !== undefined ? a.fbtStartYear : undefined),

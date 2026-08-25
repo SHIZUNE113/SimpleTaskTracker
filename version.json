@@ -2,6 +2,22 @@
   "previous_url": "",
   "versions": [
     {
+      "version": "1.5.0",
+      "date": "2026-08-26",
+      "notes_zh": [
+        "🔄 可以换负责人了!点任务上的负责人小标签(现在带个▾箭头),就能选人或直接新建一个",
+        "🔗 换人是整条任务链一起换:当前这一期 + 之后自动生成的每一期,全部跟着走——同事离职交接一次点完喵",
+        "📚 历史记录不改:归档里存的是当年实际是谁做的。但从归档恢复任务时会自动接手成链上现在的负责人,不会把活又塞回给离职的人",
+        "📝 Other(一次性任务)没有链,所以只改它自己"
+      ],
+      "notes_en": [
+        "🔄 You can now reassign a task: click the assignee tag on any card (it has a ▾ now) to pick someone else, or create a new person on the spot",
+        "🔗 Reassigning moves the whole chain: the current period plus every future period it spawns — so a staff handover is one click per chain",
+        "📚 History stays honest: archive entries keep whoever actually did that period. Restoring one from the archive hands it to the chain's CURRENT assignee, not the person who left",
+        "📝 Other (one-off) tasks have no chain, so those reassign on their own"
+      ]
+    },
+    {
       "version": "1.4.0",
       "date": "2026-08-18",
       "notes_zh": [
