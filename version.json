@@ -2,6 +2,24 @@
   "previous_url": "",
   "versions": [
     {
+      "version": "1.6.0",
+      "date": "2026-08-26",
+      "notes_zh": [
+        "📝 新增记事本(Quick Notes):标题旁多了个小按钮,点开是个独立的多页笔记本,跟客户任务完全不相关",
+        "📌 第一页固定叫 Quick Note,打开记事本永远先看到它;后面新建的页面自己起名、可改名可删除",
+        "🔍 记事本自带关键词搜索,按标题或内容过滤页面",
+        "🖊️ 编辑区支持加粗/下划线/删除线/字体颜色/项目符号,内容会跟着窗口宽度自动换行",
+        "💾 记事本内容也会一起打包进导出备份;导入旧备份(没有记事本数据)不会清空你现有的笔记"
+      ],
+      "notes_en": [
+        "📝 New Quick Notes: a small button next to the title opens a standalone multi-page notebook, entirely separate from client tasks",
+        "📌 The first page is always \"Quick Note\" and is what you land on every time you open the notebook; pages you add after that can be named, renamed, and deleted freely",
+        "🔍 Built-in keyword search filters pages by title or content",
+        "🖊️ The editor supports bold/underline/strikethrough/text color/bullet lists, and wraps to fit whatever width the window is",
+        "💾 Notebook content is included in backup exports; importing an older backup (with no notebook data) leaves your existing notes untouched"
+      ]
+    },
+    {
       "version": "1.5.0",
       "date": "2026-08-26",
       "notes_zh": [

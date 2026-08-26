@@ -114,6 +114,36 @@
   .seg { display: flex; gap: 6px; }
   .seg button { flex: 1; padding: 9px; border: 1px solid var(--line); background: #fff; border-radius: 8px; font-size: 12.5px; font-weight: 600; cursor: pointer; color: var(--ink-soft); }
   .seg button.sel { background: var(--ink); color: #fff; border-color: var(--ink); }
+
+  /* ---------- Quick Notes ---------- */
+  .notebook-modal { max-width: 680px; width: 100%; height: 88vh; display: flex; flex-direction: column; padding: 16px 16px 12px; }
+  .notebook-modal h2 { margin: 0 0 10px; }
+  .notebook-search input { width: 100%; padding: 8px 11px; border: 1px solid var(--line); border-radius: 9px; font-size: 13px; background: #fff; margin-bottom: 8px; box-sizing: border-box; }
+  .notebook-pages { display: flex; gap: 6px; flex-wrap: nowrap; overflow-x: auto; padding-bottom: 8px; margin-bottom: 4px; -webkit-overflow-scrolling: touch; }
+  .notebook-pages .chip { flex-shrink: 0; }
+  .notebook-pages .chip.pinned { display: flex; align-items: center; gap: 3px; }
+  .notebook-editor-wrap { flex: 1; display: flex; flex-direction: column; min-height: 0; }
+  .notebook-editor {
+    flex: 1; min-height: 0; overflow-y: auto; border: 1px solid var(--line); border-radius: 10px;
+    padding: 12px; font-size: 14px; line-height: 1.6; background: #fff; color: var(--ink);
+    white-space: pre-wrap; word-wrap: break-word; overflow-wrap: break-word; word-break: break-word;
+    box-sizing: border-box; outline: none;
+  }
+  .notebook-editor:empty::before { content: attr(data-placeholder); color: var(--ink-soft); opacity: 0.6; }
+  .notebook-editor ul { margin: 4px 0; padding-left: 22px; }
+  .notebook-toolbar { display: flex; gap: 5px; align-items: center; margin-top: 8px; flex-wrap: wrap; }
+  .notebook-toolbar button {
+    border: 1px solid var(--line); background: #fff; border-radius: 7px; width: 32px; height: 32px;
+    font-size: 13px; font-weight: 700; cursor: pointer; color: var(--ink-soft); display: flex; align-items: center; justify-content: center;
+  }
+  .notebook-toolbar button.u { text-decoration: underline; }
+  .notebook-toolbar button.s { text-decoration: line-through; }
+  .notebook-toolbar input[type="color"] { width: 32px; height: 32px; padding: 2px; border: 1px solid var(--line); border-radius: 7px; cursor: pointer; background: #fff; }
+  .notebook-manage-row { text-align: right; margin-bottom: 4px; }
+  .notebook-manage-row .chip { font-size: 11.5px; }
+  .notebook-page-row { display: flex; align-items: center; gap: 8px; padding: 8px 0; border-bottom: 1px solid var(--line); }
+  .notebook-page-row input { flex: 1; padding: 6px 8px; border: 1px solid var(--line); border-radius: 7px; font-size: 13px; }
+  .notebook-page-row .pin-note { flex: 1; font-size: 13px; color: var(--ink-soft); font-style: italic; }
   .modal-actions { display: flex; gap: 8px; margin-top: 16px; }
   .modal-actions button { flex: 1; padding: 11px; border-radius: 8px; border: none; font-size: 14px; font-weight: 700; cursor: pointer; }
   .btn-cancel { background: #eef0f2; color: var(--ink-soft); }
@@ -141,6 +171,7 @@
     <h1 data-i18n="appTitle">客户任务追踪</h1>
     <div class="header-right">
       <div class="today" id="todayLabel"></div>
+      <button class="icon-btn" id="notesBtn" title="Quick Notes">📝</button>
       <button class="icon-btn" id="langToggleBtn">EN</button>
       <button class="icon-btn" id="exportBtn" title="Export">⬆</button>
       <button class="icon-btn" id="importBtn" title="Import">⬇</button>
@@ -295,6 +326,49 @@
   </div>
 </div>
 
+<div class="modal-backdrop" id="notebookModalBackdrop">
+  <div class="modal notebook-modal">
+    <h2 data-i18n="notebookTitle">记事本</h2>
+    <div class="notebook-manage-row"><button class="chip" id="notebookManageBtn" data-i18n="btnManagePages">管理页面</button></div>
+    <div class="notebook-search"><input id="notebookSearch" data-i18n-placeholder="notebookSearchPlaceholder" placeholder="搜索标题或内容..."></div>
+    <div class="notebook-pages" id="notebookPagesRow"></div>
+    <div class="notebook-editor-wrap">
+      <div class="notebook-editor" id="notebookEditor" contenteditable="true" data-i18n-placeholder="notebookEditorPlaceholder" data-placeholder="随便写点什么..."></div>
+      <div class="notebook-toolbar">
+        <button type="button" id="nbBoldBtn" title="Bold"><b>B</b></button>
+        <button type="button" id="nbUnderlineBtn" class="u" title="Underline">U</button>
+        <button type="button" id="nbStrikeBtn" class="s" title="Strikethrough">S</button>
+        <input type="color" id="nbColorInput" title="Text color" value="#1c2733">
+        <button type="button" id="nbBulletBtn" title="Bullet list">•≡</button>
+      </div>
+    </div>
+    <div class="modal-actions" style="margin-top:10px;">
+      <button class="btn-save" id="notebookCloseBtn" data-i18n="btnClose">完成</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-backdrop" id="notebookNewPageModalBackdrop">
+  <div class="modal">
+    <h2 data-i18n="notebookNewPageTitle">新建页面</h2>
+    <div class="field"><input id="notebookNewPageName" data-i18n-placeholder="notebookPageNamePlaceholder" placeholder="给这页起个名字"></div>
+    <div class="modal-actions">
+      <button class="btn-cancel" id="notebookNewPageCancelBtn" data-i18n="btnCancel">取消</button>
+      <button class="btn-save" id="notebookNewPageSaveBtn" data-i18n="btnAdd">添加</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-backdrop" id="notebookManageModalBackdrop">
+  <div class="modal">
+    <h2 data-i18n="btnManagePages">管理页面</h2>
+    <div id="notebookManageList"></div>
+    <div class="modal-actions">
+      <button class="btn-save" id="notebookManageCloseBtn" data-i18n="btnClose">完成</button>
+    </div>
+  </div>
+</div>
+
 <div class="modal-backdrop" id="reassignModalBackdrop">
   <div class="modal">
     <h2 data-i18n="reassignTitle">转移负责人</h2>
@@ -381,6 +455,7 @@ const STORAGE_KEY = 'tasks-v1';
 const ARCHIVE_KEY = 'archive-v1';
 const NOTES_KEY = 'client-notes-v1';
 const STAFF_KEY = 'staff-list-v1';
+const NOTEBOOK_KEY = 'notebook-pages-v1';
 const LANG_KEY = 'lang-pref-v1';
 const LAST_EXPORT_KEY = 'last-export-at-v1';
 const LAST_SEEN_VERSION_KEY = 'last-seen-app-version-v1';
@@ -391,7 +466,7 @@ let updateModalShowing = false;
 // Bump APP_VERSION on every release. Point VERSION_CHECK_URL at a version.json file hosted
 // alongside this html (e.g. on GitHub Pages) once you set that up - leave it blank to disable
 // the update-check entirely (the app works fine either way).
-const APP_VERSION = '1.5.0';
+const APP_VERSION = '1.6.0';
 const VERSION_CHECK_URL = 'https://shizune113.github.io/SimpleTaskTracker/version.json';
 
 // DATA_VERSION is separate from APP_VERSION: bump this only when the *shape* of saved data
@@ -437,6 +512,11 @@ let tasks = [];
 let archive = [];
 let clientNotes = {};
 let staffList = [];
+const NB_PINNED_ID = 'qn_pinned';
+let notebookPages = [];      // [{ id, name, content, pinned }] - content is sanitized HTML from the editor
+let activeNotePageId = null;
+let notebookSaveTimeout = null;
+let notebookSavedRange = null; // selection kept alive across toolbar-button clicks (see notebook toolbar section)
 let lastAction = null;
 let undoTimeout = null;
 let archiveSortMode = 'time';
@@ -483,6 +563,10 @@ const I18N = {
     reassignTitle: '转移负责人',
     reassignHint: '会套用到这条任务链:当前任务和之后自动生成的每一期。历史记录保持原样。',
     toastReassigned: '已转给 {name}', toastReassignSame: '本来就是这个人喵',
+    notebookTitle: '记事本', btnManagePages: '管理页面', notebookSearchPlaceholder: '搜索标题或内容...',
+    notebookEditorPlaceholder: '随便写点什么...', notebookNewPageTitle: '新建页面', notebookPageNamePlaceholder: '给这页起个名字',
+    quickNoteName: 'Quick Note', pinNote: '固定页面,不能改名或删除',
+    toastNeedPageName: '先给页面起个名字喵', toastPageDeleted: '已删除页面', emptyNotebookSearch: '没有匹配的页面',
     manageStaffTitle: '管理负责人', emptyStaff: '还没有添加负责人',
     footerCredit: '本软件由猫猫幻雪与Claude共同完成喵o( •w• )o',
     updateAvailableTitle: '有新版本喵!', updateVersionLabel: '版本', updateLater: '稍后', updateReload: '知道了',
@@ -527,6 +611,10 @@ const I18N = {
     reassignTitle: 'Reassign',
     reassignHint: 'Applies to the whole chain: this task and every future period it spawns. Archive history is left as-is.',
     toastReassigned: 'Reassigned to {name}', toastReassignSame: 'Already assigned to them',
+    notebookTitle: 'Quick Notes', btnManagePages: 'Manage pages', notebookSearchPlaceholder: 'Search titles or content...',
+    notebookEditorPlaceholder: 'Write anything...', notebookNewPageTitle: 'New page', notebookPageNamePlaceholder: 'Name this page',
+    quickNoteName: 'Quick Note', pinNote: 'Pinned page — can\'t be renamed or deleted',
+    toastNeedPageName: 'Name the page first', toastPageDeleted: 'Page deleted', emptyNotebookSearch: 'No matching pages',
     manageStaffTitle: 'Manage assignees', emptyStaff: 'No assignees added yet',
     footerCredit: 'Built by huanxue the cat & Claude o( •w• )o',
     updateAvailableTitle: 'New version available!', updateVersionLabel: 'Version', updateLater: 'Later', updateReload: 'Got it',
@@ -563,12 +651,19 @@ function checkBackupReminder(){
 function translatePage(){
   document.getElementById('pageTitle').textContent = tr('appTitle');
   document.querySelectorAll('[data-i18n]').forEach(el => { el.textContent = tr(el.getAttribute('data-i18n')); });
-  document.querySelectorAll('[data-i18n-placeholder]').forEach(el => { el.placeholder = tr(el.getAttribute('data-i18n-placeholder')); });
+  document.querySelectorAll('[data-i18n-placeholder]').forEach(el => {
+    // Real inputs/textareas use the native placeholder property; the notebook editor is a
+    // contenteditable div whose "placeholder" is CSS (:empty::before, attr(data-placeholder)),
+    // so it needs the attribute set directly instead.
+    const val = tr(el.getAttribute('data-i18n-placeholder'));
+    if ('placeholder' in el) el.placeholder = val; else el.setAttribute('data-placeholder', val);
+  });
   document.getElementById('langToggleBtn').textContent = currentLang === 'zh' ? 'EN' : '中文';
   document.getElementById('footerVersion').textContent = 'v' + APP_VERSION;
   document.getElementById('dataWarningEl').innerHTML = tr('dataWarning');
   renderWhoFilterChips();
   renderSortModeChips();
+  if (document.getElementById('notebookModalBackdrop').classList.contains('open')) renderNotebookPages();
   checkBackupReminder();
 }
 
@@ -750,6 +845,16 @@ function normalizeTask(t){
     completedAt: t.completedAt || null
   };
 }
+function normalizeNotePage(p){
+  p = p || {};
+  const pinned = p.id === NB_PINNED_ID || p.pinned === true;
+  return {
+    id: p.id || ('nb'+Date.now()+Math.random().toString(36).slice(2,7)),
+    name: pinned ? null : (p.name || ''), // pinned page's display name is always the i18n label, never stored
+    content: typeof p.content === 'string' ? p.content : '',
+    pinned
+  };
+}
 function normalizeArchiveEntry(a){
   a = a || {};
   return {
@@ -770,6 +875,20 @@ async function loadData(){
   try { const a = await storageGet(ARCHIVE_KEY); archive = a ? JSON.parse(a.value) : []; } catch(e){ archive = []; }
   try { const n = await storageGet(NOTES_KEY); clientNotes = n ? JSON.parse(n.value) : {}; } catch(e){ clientNotes = {}; }
   try { const s = await storageGet(STAFF_KEY); staffList = s ? JSON.parse(s.value) : []; } catch(e){ staffList = []; }
+  try {
+    const nb = await storageGet(NOTEBOOK_KEY);
+    notebookPages = nb ? JSON.parse(nb.value) : null;
+  } catch(e){ notebookPages = null; }
+  if (!Array.isArray(notebookPages) || notebookPages.length === 0){
+    // First run (or corrupted data): seed the one page that always exists and can't be removed.
+    notebookPages = [{ id: NB_PINNED_ID, name: null, content: '', pinned: true }];
+  } else if (!notebookPages.some(p => p.id === NB_PINNED_ID)){
+    // Defensive: something wiped the pinned page (e.g. a hand-edited import) - put it back
+    // at the front rather than leaving the notebook with no default landing page.
+    notebookPages.unshift({ id: NB_PINNED_ID, name: null, content: '', pinned: true });
+  }
+  notebookPages = notebookPages.map(normalizeNotePage);
+  await saveNotebook();
   try { currentLang = localStorage.getItem(LANG_KEY) || 'en'; } catch(e){ currentLang = 'en'; }
   try { collapsedTypes = JSON.parse(localStorage.getItem(COLLAPSED_KEY) || '{}'); } catch(e){ collapsedTypes = {}; }
   try { sortMode = localStorage.getItem(SORT_MODE_KEY) || 'client'; } catch(e){ sortMode = 'client'; }
@@ -790,6 +909,7 @@ async function saveTasks(){ const ok = await storageSet(STORAGE_KEY, JSON.string
 async function saveArchive(){ const ok = await storageSet(ARCHIVE_KEY, JSON.stringify(archive)); if (!ok) showToast(tr('toastSaveFail')); }
 async function saveNotes(){ const ok = await storageSet(NOTES_KEY, JSON.stringify(clientNotes)); if (!ok) showToast(tr('toastSaveFail')); }
 async function saveStaffList(){ const ok = await storageSet(STAFF_KEY, JSON.stringify(staffList)); if (!ok) showToast(tr('toastSaveFail')); }
+async function saveNotebook(){ const ok = await storageSet(NOTEBOOK_KEY, JSON.stringify(notebookPages)); if (!ok) showToast(tr('toastSaveFail')); }
 function saveLang(){ try { localStorage.setItem(LANG_KEY, currentLang); } catch(e){} }
 
 // ---------- self-check ----------
@@ -979,6 +1099,190 @@ async function applyReassign(name){
 }
 document.getElementById('reassignCancelBtn').addEventListener('click', () => { document.getElementById('reassignModalBackdrop').classList.remove('open'); reassignEditingId = null; });
 document.getElementById('reassignModalBackdrop').addEventListener('click', (e) => { if (e.target.id === 'reassignModalBackdrop'){ e.target.classList.remove('open'); reassignEditingId = null; } });
+
+// ---------- Quick Notes (a small self-contained notebook, unrelated to task data) ----------
+// One page (NB_PINNED_ID) always exists, can't be renamed or deleted, and is always the page
+// shown when the notebook is opened - it's the "just jot something down" landing spot.
+// Everything else is a free-form page the user names themselves. Content is stored as the
+// editor's innerHTML (so bold/underline/strike/color/bullets survive reloads) rather than
+// plain text.
+function pageLabel(p){ return p.pinned ? tr('quickNoteName') : (p.name || ''); }
+function pageMatches(p, q){
+  if (!q) return true;
+  const hay = (pageLabel(p) + ' ' + stripTags(p.content)).toLowerCase();
+  return hay.includes(q.toLowerCase());
+}
+function stripTags(html){ return (html || '').replace(/<[^>]*>/g, ' '); }
+
+function openNotebookModal(){
+  activeNotePageId = NB_PINNED_ID; // always land on Quick Note, regardless of what was open last time
+  document.getElementById('notebookSearch').value = '';
+  renderNotebookPages();
+  loadNotePageIntoEditor();
+  document.getElementById('notebookModalBackdrop').classList.add('open');
+  document.getElementById('notebookEditor').focus();
+}
+function renderNotebookPages(){
+  const row = document.getElementById('notebookPagesRow');
+  const q = document.getElementById('notebookSearch').value.trim();
+  row.innerHTML = '';
+  const visible = notebookPages.filter(p => pageMatches(p, q));
+  if (visible.length === 0){
+    row.innerHTML = `<span class="sort-label">${tr('emptyNotebookSearch')}</span>`;
+  }
+  visible.forEach(p => {
+    const chip = document.createElement('button');
+    chip.type = 'button';
+    chip.className = 'chip' + (p.pinned ? ' pinned' : '') + (activeNotePageId === p.id ? ' sel' : '');
+    chip.textContent = (p.pinned ? '📌 ' : '') + pageLabel(p);
+    chip.title = p.pinned ? tr('pinNote') : '';
+    chip.addEventListener('click', () => { switchNotePage(p.id); });
+    row.appendChild(chip);
+  });
+  const addChip = document.createElement('button');
+  addChip.type = 'button';
+  addChip.className = 'chip add-chip';
+  addChip.textContent = '+';
+  addChip.addEventListener('click', () => {
+    document.getElementById('notebookNewPageName').value = '';
+    document.getElementById('notebookNewPageModalBackdrop').classList.add('open');
+  });
+  row.appendChild(addChip);
+}
+function switchNotePage(id){
+  if (id === activeNotePageId) return;
+  saveCurrentNoteContent(); // flush whatever's in the editor before we swap it out from under the user
+  activeNotePageId = id;
+  renderNotebookPages();
+  loadNotePageIntoEditor();
+}
+function loadNotePageIntoEditor(){
+  const p = notebookPages.find(x => x.id === activeNotePageId);
+  document.getElementById('notebookEditor').innerHTML = p ? p.content : '';
+}
+function saveCurrentNoteContent(){
+  const p = notebookPages.find(x => x.id === activeNotePageId);
+  if (!p) return;
+  p.content = document.getElementById('notebookEditor').innerHTML;
+}
+document.getElementById('notesBtn').addEventListener('click', openNotebookModal);
+document.getElementById('notebookCloseBtn').addEventListener('click', async () => {
+  saveCurrentNoteContent();
+  await saveNotebook();
+  document.getElementById('notebookModalBackdrop').classList.remove('open');
+});
+document.getElementById('notebookModalBackdrop').addEventListener('click', async (e) => {
+  if (e.target.id === 'notebookModalBackdrop'){
+    saveCurrentNoteContent();
+    await saveNotebook();
+    e.target.classList.remove('open');
+  }
+});
+document.getElementById('notebookSearch').addEventListener('input', renderNotebookPages);
+
+// Debounced autosave: fires shortly after typing stops, so a crash/reload mid-edit loses at
+// most a couple of seconds of work rather than the whole session's notes.
+document.getElementById('notebookEditor').addEventListener('input', () => {
+  clearTimeout(notebookSaveTimeout);
+  notebookSaveTimeout = setTimeout(async () => { saveCurrentNoteContent(); await saveNotebook(); }, 600);
+});
+
+// ---------- notebook toolbar ----------
+// The color input (and, on some browsers, any button click) can steal focus/selection away
+// from the contenteditable editor before the formatting command fires. Track the last
+// selection made *inside* the editor and restore it right before running a command, so
+// formatting always applies to what the user actually selected.
+document.getElementById('notebookEditor').addEventListener('mouseup', captureNoteSelection);
+document.getElementById('notebookEditor').addEventListener('keyup', captureNoteSelection);
+function captureNoteSelection(){
+  const sel = window.getSelection();
+  if (sel && sel.rangeCount > 0 && document.getElementById('notebookEditor').contains(sel.anchorNode)){
+    notebookSavedRange = sel.getRangeAt(0).cloneRange();
+  }
+}
+function restoreNoteSelection(){
+  if (!notebookSavedRange) return;
+  const sel = window.getSelection();
+  sel.removeAllRanges();
+  sel.addRange(notebookSavedRange);
+}
+function runNoteCommand(cmd, value){
+  document.getElementById('notebookEditor').focus();
+  restoreNoteSelection();
+  try { document.execCommand(cmd, false, value); } catch(e){}
+  clearTimeout(notebookSaveTimeout);
+  notebookSaveTimeout = setTimeout(async () => { saveCurrentNoteContent(); await saveNotebook(); }, 600);
+}
+// mousedown (not click) + preventDefault stops the button itself from taking focus, which is
+// what would otherwise collapse the editor's text selection before the command runs.
+['nbBoldBtn','nbUnderlineBtn','nbStrikeBtn','nbBulletBtn'].forEach(id => {
+  document.getElementById(id).addEventListener('mousedown', (e) => e.preventDefault());
+});
+document.getElementById('nbBoldBtn').addEventListener('click', () => runNoteCommand('bold'));
+document.getElementById('nbUnderlineBtn').addEventListener('click', () => runNoteCommand('underline'));
+document.getElementById('nbStrikeBtn').addEventListener('click', () => runNoteCommand('strikeThrough'));
+document.getElementById('nbBulletBtn').addEventListener('click', () => runNoteCommand('insertUnorderedList'));
+document.getElementById('nbColorInput').addEventListener('mousedown', captureNoteSelection);
+document.getElementById('nbColorInput').addEventListener('input', (e) => runNoteCommand('foreColor', e.target.value));
+
+// ---------- new page modal ----------
+document.getElementById('notebookNewPageCancelBtn').addEventListener('click', () => document.getElementById('notebookNewPageModalBackdrop').classList.remove('open'));
+document.getElementById('notebookNewPageModalBackdrop').addEventListener('click', (e) => { if (e.target.id === 'notebookNewPageModalBackdrop') e.target.classList.remove('open'); });
+document.getElementById('notebookNewPageSaveBtn').addEventListener('click', async () => {
+  const name = document.getElementById('notebookNewPageName').value.trim();
+  if (!name){ showToast(tr('toastNeedPageName')); return; }
+  saveCurrentNoteContent();
+  const page = normalizeNotePage({ name, content: '', pinned: false });
+  notebookPages.push(page);
+  await saveNotebook();
+  document.getElementById('notebookNewPageModalBackdrop').classList.remove('open');
+  activeNotePageId = page.id;
+  renderNotebookPages();
+  loadNotePageIntoEditor();
+  document.getElementById('notebookEditor').focus();
+});
+
+// ---------- manage pages (rename / delete) - mirrors the staff-management modal ----------
+document.getElementById('notebookManageBtn').addEventListener('click', () => {
+  saveCurrentNoteContent();
+  renderNotebookManageList();
+  document.getElementById('notebookManageModalBackdrop').classList.add('open');
+});
+function renderNotebookManageList(){
+  const el = document.getElementById('notebookManageList');
+  el.innerHTML = notebookPages.map(p => `
+    <div class="notebook-page-row" data-id="${p.id}">
+      ${p.pinned
+        ? `<span class="pin-note">📌 ${escapeHtml(tr('quickNoteName'))} — ${escapeHtml(tr('pinNote'))}</span>`
+        : `<input type="text" value="${escapeHtml(p.name || '')}" data-rename="${p.id}">
+           <button class="restore-btn" data-delete="${p.id}" style="color:var(--danger);border-color:var(--danger-bg);">${tr('btnDelete')}</button>`}
+    </div>
+  `).join('');
+  el.querySelectorAll('input[data-rename]').forEach(input => {
+    input.addEventListener('change', async () => {
+      const p = notebookPages.find(x => x.id === input.dataset.rename); if (!p) return;
+      const name = input.value.trim();
+      if (!name){ showToast(tr('toastNeedPageName')); input.value = p.name || ''; return; }
+      p.name = name;
+      await saveNotebook();
+      renderNotebookPages();
+    });
+  });
+  el.querySelectorAll('button[data-delete]').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const id = btn.dataset.delete;
+      notebookPages = notebookPages.filter(x => x.id !== id);
+      if (activeNotePageId === id) activeNotePageId = NB_PINNED_ID; // never leave the editor pointed at a page that no longer exists
+      await saveNotebook();
+      renderNotebookManageList();
+      renderNotebookPages();
+      loadNotePageIntoEditor();
+      showToast(tr('toastPageDeleted'));
+    });
+  });
+}
+document.getElementById('notebookManageCloseBtn').addEventListener('click', () => document.getElementById('notebookManageModalBackdrop').classList.remove('open'));
+document.getElementById('notebookManageModalBackdrop').addEventListener('click', (e) => { if (e.target.id === 'notebookManageModalBackdrop') e.target.classList.remove('open'); });
 
 // ---------- rendering ----------
 const typeOrder = ['BAS','Return','FBT','Misc','Other'];
@@ -1337,7 +1641,7 @@ document.getElementById('langToggleBtn').addEventListener('click', () => {
   renderArchive(document.getElementById('archiveSearch').value);
 });
 function exportBackup(){
-  const payload = JSON.stringify({ dataVersion: DATA_VERSION, tasks, archive, clientNotes, staffList, exportedAt: fmt(new Date()) }, null, 2);
+  const payload = JSON.stringify({ dataVersion: DATA_VERSION, tasks, archive, clientNotes, staffList, notebookPages, exportedAt: fmt(new Date()) }, null, 2);
   const blob = new Blob([payload], { type: 'application/json' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
@@ -1364,8 +1668,14 @@ document.getElementById('importFile').addEventListener('change', (e) => {
       archive = migrated.archive.map(normalizeArchiveEntry);
       clientNotes = migrated.clientNotes;
       staffList = migrated.staffList;
+      // Older backups predate Quick Notes entirely, so a missing key means "don't touch it"
+      // rather than "wipe the notebook" - notebookPages keeps whatever was already there.
+      if (Array.isArray(data.notebookPages) && data.notebookPages.length > 0){
+        notebookPages = data.notebookPages.map(normalizeNotePage);
+        if (!notebookPages.some(p => p.id === NB_PINNED_ID)) notebookPages.unshift(normalizeNotePage({ id: NB_PINNED_ID, pinned: true }));
+      }
       await storageSet(SCHEMA_KEY, String(DATA_VERSION));
-      await saveTasks(); await saveArchive(); await saveNotes(); await saveStaffList();
+      await saveTasks(); await saveArchive(); await saveNotes(); await saveStaffList(); await saveNotebook();
       renderWhoFilterChips(); render(); renderArchive(document.getElementById('archiveSearch').value);
       showToast(tr('toastImported'));
     } catch(err){ showToast(tr('toastImportFail')); }
