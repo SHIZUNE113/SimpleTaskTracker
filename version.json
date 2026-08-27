@@ -2,37 +2,53 @@
   "previous_url": "",
   "versions": [
     {
+      "version": "1.6.1",
+      "date": "2026-08-26",
+      "notes_zh": [
+        "🧮 记事本装了个算盘喵:打「1100+500=」自动补上 1,600。想接着算就继续打「/10=」,它会一直陪你算下去喵",
+        "📐 括号和乘除优先级都认得清清楚楚喵,1+6/2 和 (1+6)/2 不会算成一个答案。除不尽的只留两位小数,不会给你吐一整屏的 0.333333喵",
+        "🔢 数字自动穿千位分隔符,1600 变 1,600,瞬间有会计味了喵",
+        "🛡️ 那个逗号是特制的,长得像但你打不出来喵。所以「支出500, 1000-500=」只会算 1000-500,不会顺手把支出也拖下水喵"
+      ],
+      "notes_en": [
+        "🧮 The notebook grew a calculator: type \"1100+500=\" and 1,600 appears. Keep going with \"/10=\" and it keeps up",
+        "📐 It knows BODMAS — 1+6/2 and (1+6)/2 are not the same answer. Results stop at 2 decimals, so no more screenful of 0.333333",
+        "🔢 Numbers dress up automatically: 1600 becomes 1,600. Instant accountant energy",
+        "🛡️ That comma is a body double — looks the part, can't be typed. So \"expense 500, 1000-500=\" only does 1000-500 and leaves your expenses out of it"
+      ]
+    },
+    {
       "version": "1.6.0",
       "date": "2026-08-26",
       "notes_zh": [
-        "📝 新增记事本(Quick Notes):标题旁多了个小按钮,点开是个独立的多页笔记本,跟客户任务完全不相关",
-        "📌 第一页固定叫 Quick Note,打开记事本永远先看到它;后面新建的页面自己起名、可改名可删除",
-        "🔍 记事本自带关键词搜索,按标题或内容过滤页面",
-        "🖊️ 编辑区支持加粗/下划线/删除线/字体颜色/项目符号,内容会跟着窗口宽度自动换行",
-        "💾 记事本内容也会一起打包进导出备份;导入旧备份(没有记事本数据)不会清空你现有的笔记"
+        "📝 标题旁边搬来了一本记事本喵,想记什么记什么,跟客户任务井水不犯河水",
+        "📌 第一页 Quick Note 是钉死的,每次打开都先落在这儿喵。后面的页面随你起名、改名、删除",
+        "🔍 页面多了也不怕,搜索框认标题也认内容喵",
+        "🖊️ 加粗、下划线、删除线、颜色、项目符号都在编辑区下面待命喵,换行自己会跟着窗口走",
+        "💾 笔记会跟着备份一起走。导入没有笔记的旧备份?放心,不动你现有的喵"
       ],
       "notes_en": [
-        "📝 New Quick Notes: a small button next to the title opens a standalone multi-page notebook, entirely separate from client tasks",
-        "📌 The first page is always \"Quick Note\" and is what you land on every time you open the notebook; pages you add after that can be named, renamed, and deleted freely",
-        "🔍 Built-in keyword search filters pages by title or content",
-        "🖊️ The editor supports bold/underline/strikethrough/text color/bullet lists, and wraps to fit whatever width the window is",
-        "💾 Notebook content is included in backup exports; importing an older backup (with no notebook data) leaves your existing notes untouched"
+        "📝 A notebook has moved in next to the title — jot down whatever, completely separate from client tasks",
+        "📌 Page one, \"Quick Note\", is nailed down and always where you land. Every page after that is yours to name, rename, or bin",
+        "🔍 Search finds pages by title or by what's inside them",
+        "🖊️ Bold, underline, strikethrough, colour and bullets are waiting under the editor. Text wraps to fit whatever width you've got",
+        "💾 Notes ride along with your backups. Importing an old one with no notes? It leaves yours alone"
       ]
     },
     {
       "version": "1.5.0",
       "date": "2026-08-26",
       "notes_zh": [
-        "🔄 可以换负责人了!点任务上的负责人小标签(现在带个▾箭头),就能选人或直接新建一个",
-        "🔗 换人是整条任务链一起换:当前这一期 + 之后自动生成的每一期,全部跟着走——同事离职交接一次点完喵",
-        "📚 历史记录不改:归档里存的是当年实际是谁做的。但从归档恢复任务时会自动接手成链上现在的负责人,不会把活又塞回给离职的人",
-        "📝 Other(一次性任务)没有链,所以只改它自己"
+        "🔄 负责人可以换人了喵!点任务上那个带 ▾ 的名字标签,选人或者现场新建一个",
+        "🔗 换一次,整条链跟着走:这一期加上以后自动生成的每一期。同事离职交接,一条链一次点完喵",
+        "📚 历史记录不改口供喵,当年谁做的就是谁做的。但从归档恢复回来的任务会自动认现在的负责人,不会把活又塞回给已经走的人喵",
+        "📝 Other 是一次性任务,没有链,只改它自己喵"
       ],
       "notes_en": [
-        "🔄 You can now reassign a task: click the assignee tag on any card (it has a ▾ now) to pick someone else, or create a new person on the spot",
-        "🔗 Reassigning moves the whole chain: the current period plus every future period it spawns — so a staff handover is one click per chain",
-        "📚 History stays honest: archive entries keep whoever actually did that period. Restoring one from the archive hands it to the chain's CURRENT assignee, not the person who left",
-        "📝 Other (one-off) tasks have no chain, so those reassign on their own"
+        "🔄 Assignees can be swapped now — click the name tag with the ▾ on it and pick someone, or invent someone on the spot",
+        "🔗 One click moves the whole chain: this period and every future one it spawns. A leaver's handover is one click per chain",
+        "📚 History doesn't change its story — the archive keeps whoever actually did it. But restoring a task hands it to the CURRENT owner, not the person who left",
+        "📝 Other tasks are one-offs with no chain, so they move on their own"
       ]
     },
     {

@@ -466,7 +466,7 @@ let updateModalShowing = false;
 // Bump APP_VERSION on every release. Point VERSION_CHECK_URL at a version.json file hosted
 // alongside this html (e.g. on GitHub Pages) once you set that up - leave it blank to disable
 // the update-check entirely (the app works fine either way).
-const APP_VERSION = '1.6.0';
+const APP_VERSION = '1.6.1';
 const VERSION_CHECK_URL = 'https://shizune113.github.io/SimpleTaskTracker/version.json';
 
 // DATA_VERSION is separate from APP_VERSION: bump this only when the *shape* of saved data
@@ -1159,6 +1159,7 @@ function switchNotePage(id){
 function loadNotePageIntoEditor(){
   const p = notebookPages.find(x => x.id === activeNotePageId);
   document.getElementById('notebookEditor').innerHTML = p ? p.content : '';
+  lastCalcInsert = null; // the node it referred to is gone with the previous page's content
 }
 function saveCurrentNoteContent(){
   const p = notebookPages.find(x => x.id === activeNotePageId);
@@ -1185,6 +1186,245 @@ document.getElementById('notebookSearch').addEventListener('input', renderNotebo
 document.getElementById('notebookEditor').addEventListener('input', () => {
   clearTimeout(notebookSaveTimeout);
   notebookSaveTimeout = setTimeout(async () => { saveCurrentNoteContent(); await saveNotebook(); }, 600);
+});
+
+// ---------- inline calculator ("1100+500=" auto-completes to "1100+500=1600") ----------
+// A small recursive-descent parser (not eval()) so precedence and parentheses are handled
+// properly: "1+6/2=" must divide first (=4), while "(1+6)/2=" must add first (=3.5).
+// A real comma (or a real Chinese sentence comma) is ordinary punctuation the user might
+// type at any time, so it can't double as our thousands-separator marker without risking a
+// prose comma being silently swallowed into a calculation (see extractTrailingExpression).
+// U+201A ('single low-9 quotation mark') reads as a comma sitting on the baseline but isn't
+// produced by any standard EN/CN keyboard or IME, so it's unambiguous: this exact character
+// only ever appears here because WE inserted it.
+const THOUSANDS_SEP = '\u201A';
+function isDigitOrSep(ch){ return ch !== undefined && (ch >= '0' && ch <= '9' || ch === THOUSANDS_SEP); }
+function evalMathExpr(str){
+  str = (str || '').trim();
+  if (!str) return null;
+  let i = 0;
+  const peek = () => str[i];
+  const skipSpace = () => { while (str[i] === ' ') i++; };
+  function parseExpr(){ // + and - (lowest precedence)
+    skipSpace();
+    let v = parseTerm();
+    if (v === null) return null;
+    while (true){
+      skipSpace();
+      const op = peek();
+      if (op === '+' || op === '-'){
+        i++;
+        const rhs = parseTerm();
+        if (rhs === null) return null;
+        v = op === '+' ? v + rhs : v - rhs;
+      } else break;
+    }
+    return v;
+  }
+  function parseTerm(){ // * and / (higher precedence than + -)
+    skipSpace();
+    let v = parseFactor();
+    if (v === null) return null;
+    while (true){
+      skipSpace();
+      const op = peek();
+      if (op === '*' || op === '/'){
+        i++;
+        const rhs = parseFactor();
+        if (rhs === null) return null;
+        if (op === '/'){ if (rhs === 0) return null; v = v / rhs; }
+        else v = v * rhs;
+      } else break;
+    }
+    return v;
+  }
+  function parseFactor(){ // unary +/-, parentheses, or a number
+    skipSpace();
+    const ch = peek();
+    if (ch === '-'){ i++; const v = parseFactor(); return v === null ? null : -v; }
+    if (ch === '+'){ i++; return parseFactor(); }
+    if (ch === '('){
+      i++;
+      const v = parseExpr();
+      skipSpace();
+      if (peek() !== ')') return null;
+      i++;
+      return v;
+    }
+    const start = i;
+    while (i < str.length && (/[0-9.]/.test(str[i]) || str[i] === THOUSANDS_SEP)) i++;
+    if (i === start) return null;
+    const numStr = str.slice(start, i).split(THOUSANDS_SEP).join(''); // strip our separator, not a real comma
+    if ((numStr.match(/\./g) || []).length > 1) return null;
+    return parseFloat(numStr);
+  }
+  const result = parseExpr();
+  skipSpace();
+  if (i !== str.length) return null; // leftover characters means it wasn't a clean expression
+  return (typeof result === 'number' && isFinite(result)) ? result : null;
+}
+function groupThousands(digits){
+  // Standard grouping: a separator before every run of 3 digits, but never before the leading digit.
+  return digits.replace(/\B(?=(\d{3})+(?!\d))/g, THOUSANDS_SEP);
+}
+function formatCalcResult(n){
+  // Accounting numbers don't need repeating-decimal precision (1/3 doesn't need 15 digits of
+  // 3s) - round to cents, then group the integer part like every other number in the notebook.
+  const rounded = Math.round((n + Number.EPSILON) * 100) / 100;
+  const neg = rounded < 0;
+  const fixed = Math.abs(rounded).toFixed(2); // e.g. "1600.00" or "0.33"
+  const [intPart, fracPart] = fixed.split('.');
+  const groupedInt = groupThousands(intPart);
+  // Whole-dollar results read cleaner without a trailing ".00"; real cents are kept.
+  const body = fracPart === '00' ? groupedInt : groupedInt + '.' + fracPart;
+  return (neg ? '-' : '') + body;
+}
+// Only the text after the LAST "=" matters, so a chained "1100+500=1600/10=" re-evaluates
+// just "1600/10" on the second "=", not the whole line. Text before that is then trimmed
+// back to the trailing run of expression-like characters, so leading prose ("Laptop ") is
+// ignored rather than breaking the parse.
+//
+// A real comma or a stray sentence-ending period must ALWAYS stop this scan - otherwise a
+// note like "income 1000 expense 500, 1000-500=" could reach back across the comma and pull
+// "expense"'s 500 into the calculation. Our own auto-inserted separator (THOUSANDS_SEP) is a
+// distinct character from a real comma specifically so this distinction is unambiguous. A
+// period is only treated as a genuine decimal point - and allowed to continue the scan - when
+// there's a digit immediately on both sides of it; a sentence period like "500. Total..." has
+// nothing but a space on its right, so it stops the scan just like a comma would.
+function extractTrailingExpression(text, resultBoundary){
+  if (text.endsWith('=')) text = text.slice(0, -1);
+  const lastEq = text.lastIndexOf('=');
+  const segStart = lastEq === -1 ? 0 : lastEq + 1;
+  const seg = text.slice(segStart);
+  // Where in `seg` a '.' would sit if it were typed immediately after our last inserted result.
+  const boundaryInSeg = (typeof resultBoundary === 'number' && resultBoundary >= 0) ? resultBoundary - segStart : -1;
+  let i = seg.length;
+  let prevWasDigit = false; // whether the character just consumed (immediately to the right) was a digit
+  while (i > 0){
+    const c = seg[i - 1];
+    if (c >= '0' && c <= '9'){ prevWasDigit = true; i--; continue; }
+    if (c === THOUSANDS_SEP){ prevWasDigit = false; i--; continue; }
+    if (c === '.'){
+      if (i - 1 === boundaryInSeg) break; // punctuation typed right after a result - end of the old calc
+      if (prevWasDigit){ prevWasDigit = false; i--; continue; } // digit-flanked = a real decimal point
+      break;
+    }
+    if (/[+\-*/()\s]/.test(c)){ prevWasDigit = false; i--; continue; }
+    break; // a real comma, a non-decimal period, a letter, anything else: stop here
+  }
+  return seg.slice(i).trim();
+}
+// Walks backward through adjacent text-node siblings (not crossing into <br>/bold/etc.) so a
+// result we inserted earlier and text typed after it are seen as one continuous run, without
+// reaching back across a line break or a formatting boundary into unrelated content.
+// Also reports where the CURRENT node's text begins within the returned string, so callers can
+// translate a position inside that node into an index into the combined text.
+function collectTextBeforeCursor(node, offset, markerNode, markerLen){
+  if (!node || node.nodeType !== Node.TEXT_NODE) return { text: '', markerEnd: -1 };
+  const parts = [];
+  let sib = node.previousSibling;
+  while (sib && sib.nodeType === Node.TEXT_NODE){ parts.unshift(sib); sib = sib.previousSibling; }
+  let text = '';
+  let markerEnd = -1;
+  for (const p of parts){
+    if (p === markerNode) markerEnd = text.length + markerLen;
+    text += p.data;
+  }
+  if (node === markerNode) markerEnd = text.length + markerLen;
+  text += node.data.slice(0, offset);
+  return { text, markerEnd: (markerEnd >= 0 && markerEnd <= text.length) ? markerEnd : -1 };
+}
+// Remembers the text node holding the most recently auto-inserted result, and how long that
+// result was. A '.' typed at exactly that boundary is the user starting a new sentence right
+// after a result ("...=3" then ". 1/2"), NOT a decimal point extending our result into "3.1" -
+// and only this bookkeeping can tell those apart, since both look like digit-dot-digit by the
+// time the next digit is typed. A '.' INSIDE a result (as in "0.50") is unaffected, so chaining
+// off a decimal result still works.
+let lastCalcInsert = null;
+function insertResultAtCursor(text){
+  const sel = window.getSelection();
+  const range = sel.getRangeAt(0);
+  const textNode = document.createTextNode(text);
+  range.insertNode(textNode);
+  range.setStartAfter(textNode);
+  range.setEndAfter(textNode);
+  sel.removeAllRanges();
+  sel.addRange(range);
+  lastCalcInsert = { node: textNode, len: text.length };
+}
+function tryInlineCalc(){
+  const editor = document.getElementById('notebookEditor');
+  const sel = window.getSelection();
+  if (!sel || sel.rangeCount === 0 || !sel.isCollapsed) return;
+  const node = sel.anchorNode;
+  if (!node || !editor.contains(node) || node.nodeType !== Node.TEXT_NODE) return;
+  const mk = lastCalcInsert;
+  const { text, markerEnd } = collectTextBeforeCursor(node, sel.anchorOffset, mk ? mk.node : null, mk ? mk.len : 0);
+  const expr = extractTrailingExpression(text, markerEnd);
+  // Require at least one digit AND one operator, so a bare "5=" (not really a calculation)
+  // is left alone rather than getting a pointless "5=5" appended.
+  if (!expr || !/[0-9]/.test(expr) || !/[+\-*/]/.test(expr)) return;
+  const result = evalMathExpr(expr);
+  if (result === null) return;
+  insertResultAtCursor(formatCalcResult(result));
+}
+// ---------- live thousands separators ("1600" -> "1,600" as you type) ----------
+// Runs after every digit keystroke, not just inside calc expressions - typed dollar figures
+// anywhere in the notebook get grouped. Assumes the common "typing left to right" case: the
+// cursor sits at the right edge of the number being formed. It only looks within the CURRENT
+// text node (not across siblings/newlines) since typing never splits nodes on its own.
+function extractNumberTokenBeforeCursor(text){
+  let j = text.length;
+  let k = j;
+  while (k > 0 && /[0-9]/.test(text[k - 1])) k--;
+  const trailingDigits = text.slice(k, j);
+  if (k > 0 && text[k - 1] === '.'){
+    // Trailing digits are a fractional part - decimals are never comma-grouped, so just
+    // record them as-is and grab the integer part (digits + any existing separators) before the dot.
+    const dotPos = k - 1;
+    let m = dotPos;
+    while (m > 0 && isDigitOrSep(text[m - 1])) m--;
+    let neg = false;
+    if (m > 0 && text[m - 1] === '-'){ neg = true; m--; }
+    return { start: m, hasDot: true, neg, intPart: text.slice(m + (neg ? 1 : 0), dotPos), fracDigits: trailingDigits };
+  }
+  // No dot immediately before the trailing digits - they're (part of) the integer portion.
+  // Keep scanning left through digits AND existing separators to pick up the full integer token.
+  let m = j;
+  while (m > 0 && isDigitOrSep(text[m - 1])) m--;
+  if (m === j) return null; // cursor isn't right after any digit - nothing to format
+  let neg = false;
+  if (m > 0 && text[m - 1] === '-'){ neg = true; m--; }
+  return { start: m, hasDot: false, neg, intPart: text.slice(m + (neg ? 1 : 0), j), fracDigits: '' };
+}
+function reformatNumberBeforeCursor(){
+  const editor = document.getElementById('notebookEditor');
+  const sel = window.getSelection();
+  if (!sel || sel.rangeCount === 0 || !sel.isCollapsed) return;
+  const node = sel.anchorNode;
+  if (!node || !editor.contains(node) || node.nodeType !== Node.TEXT_NODE) return;
+  const offset = sel.anchorOffset;
+  const textBefore = node.data.slice(0, offset);
+  const tok = extractNumberTokenBeforeCursor(textBefore);
+  if (!tok) return;
+  const rawInt = tok.intPart.split(THOUSANDS_SEP).join('');
+  if (!rawInt) return;
+  const newToken = (tok.neg ? '-' : '') + groupThousands(rawInt) + (tok.hasDot ? '.' + tok.fracDigits : '');
+  const oldToken = textBefore.slice(tok.start);
+  if (newToken === oldToken) return; // already correctly grouped - don't touch the DOM/cursor for nothing
+  // Direct data mutation (not execCommand/insertNode) so this doesn't fire its own 'input'
+  // event - no risk of re-triggering itself or the calculator trigger below.
+  node.data = node.data.slice(0, tok.start) + newToken + node.data.slice(offset);
+  const newOffset = tok.start + newToken.length;
+  const range = document.createRange();
+  range.setStart(node, newOffset);
+  range.setEnd(node, newOffset);
+  sel.removeAllRanges();
+  sel.addRange(range);
+}
+document.getElementById('notebookEditor').addEventListener('input', (e) => {
+  if (e.data === '=') tryInlineCalc();
+  else if (e.data && /^[0-9]$/.test(e.data)) reformatNumberBeforeCursor();
 });
 
 // ---------- notebook toolbar ----------
