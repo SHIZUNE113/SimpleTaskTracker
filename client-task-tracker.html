@@ -138,6 +138,7 @@
   }
   .notebook-toolbar button.u { text-decoration: underline; }
   .notebook-toolbar button.s { text-decoration: line-through; }
+  .notebook-toolbar button.clear-fmt sub { font-size: 9px; font-weight: 400; }
   .notebook-toolbar input[type="color"] { width: 32px; height: 32px; padding: 2px; border: 1px solid var(--line); border-radius: 7px; cursor: pointer; background: #fff; }
   .notebook-manage-row { text-align: right; margin-bottom: 4px; }
   .notebook-manage-row .chip { font-size: 11.5px; }
@@ -340,6 +341,7 @@
         <button type="button" id="nbStrikeBtn" class="s" title="Strikethrough">S</button>
         <input type="color" id="nbColorInput" title="Text color" value="#1c2733">
         <button type="button" id="nbBulletBtn" title="Bullet list">•≡</button>
+        <button type="button" id="nbClearFormatBtn" class="clear-fmt" title="Clear formatting (selected lines, or the line the cursor is on)">T<sub>x</sub></button>
       </div>
     </div>
     <div class="modal-actions" style="margin-top:10px;">
@@ -466,7 +468,7 @@ let updateModalShowing = false;
 // Bump APP_VERSION on every release. Point VERSION_CHECK_URL at a version.json file hosted
 // alongside this html (e.g. on GitHub Pages) once you set that up - leave it blank to disable
 // the update-check entirely (the app works fine either way).
-const APP_VERSION = '1.6.1';
+const APP_VERSION = '1.6.2';
 const VERSION_CHECK_URL = 'https://shizune113.github.io/SimpleTaskTracker/version.json';
 
 // DATA_VERSION is separate from APP_VERSION: bump this only when the *shape* of saved data
@@ -1455,7 +1457,7 @@ function runNoteCommand(cmd, value){
 }
 // mousedown (not click) + preventDefault stops the button itself from taking focus, which is
 // what would otherwise collapse the editor's text selection before the command runs.
-['nbBoldBtn','nbUnderlineBtn','nbStrikeBtn','nbBulletBtn'].forEach(id => {
+['nbBoldBtn','nbUnderlineBtn','nbStrikeBtn','nbBulletBtn','nbClearFormatBtn'].forEach(id => {
   document.getElementById(id).addEventListener('mousedown', (e) => e.preventDefault());
 });
 document.getElementById('nbBoldBtn').addEventListener('click', () => runNoteCommand('bold'));
@@ -1464,6 +1466,143 @@ document.getElementById('nbStrikeBtn').addEventListener('click', () => runNoteCo
 document.getElementById('nbBulletBtn').addEventListener('click', () => runNoteCommand('insertUnorderedList'));
 document.getElementById('nbColorInput').addEventListener('mousedown', captureNoteSelection);
 document.getElementById('nbColorInput').addEventListener('input', (e) => runNoteCommand('foreColor', e.target.value));
+document.getElementById('nbClearFormatBtn').addEventListener('click', clearNoteFormatting);
+
+// ---------- notebook formatting hygiene ----------
+// Inline wrappers that only carry formatting - safe to unwrap. Block elements (div/p/li/ul)
+// hold the line structure, so those are kept and only lose their style attributes.
+const NB_INLINE_FORMAT_TAGS = new Set(['B','STRONG','I','EM','U','S','STRIKE','DEL','INS','FONT','SPAN','MARK','SUB','SUP','A','CODE','SMALL','BIG']);
+const NB_BLOCK_TAGS = new Set(['DIV','P','LI','UL','OL','H1','H2','H3','H4','H5','H6','BLOCKQUOTE','PRE','TABLE']);
+function unwrapNode(el){
+  const parent = el.parentNode;
+  while (el.firstChild) parent.insertBefore(el.firstChild, el);
+  parent.removeChild(el);
+}
+function stripElementFormatting(el){
+  if (NB_INLINE_FORMAT_TAGS.has(el.tagName)) unwrapNode(el);
+  else ['style','class','color','face','size','align'].forEach(a => el.removeAttribute(a));
+}
+function stripFormattingFrom(node){
+  if (node.nodeType !== Node.ELEMENT_NODE) return;
+  // reversed document order = children before their parents, so unwrapping never orphans a pending node
+  Array.from(node.querySelectorAll('*')).reverse().forEach(stripElementFormatting);
+  stripElementFormatting(node);
+}
+// The editor's "lines" the range touches. A line is a block child of the editor (or an <li>
+// of a top-level list), or a run of loose inline nodes up to a <br> - Chrome leaves the very
+// first line as bare text sitting directly inside the editor.
+function noteLinesInRange(editor, range){
+  const lines = [];
+  let run = [];
+  const flush = () => { if (run.length){ lines.push(run); run = []; } };
+  Array.from(editor.childNodes).forEach(n => {
+    const isEl = n.nodeType === Node.ELEMENT_NODE;
+    if (isEl && (n.tagName === 'UL' || n.tagName === 'OL')){ flush(); Array.from(n.children).forEach(li => lines.push([li])); }
+    else if (isEl && NB_BLOCK_TAGS.has(n.tagName)){ flush(); lines.push([n]); }
+    else { run.push(n); if (n.nodeName === 'BR') flush(); }
+  });
+  flush();
+  const hit = lines.filter(line => line.some(n => range.intersectsNode(n)));
+  if (hit.length || range.startContainer !== editor) return hit;
+  // caret sitting between two top-level nodes intersects neither - take the line it follows
+  const near = editor.childNodes[range.startOffset - 1] || editor.childNodes[range.startOffset];
+  return lines.filter(line => line.some(n => n === near || n.contains(near)));
+}
+// After the last formatted character of a line is deleted, browsers keep a hidden "typing
+// style" with nothing left in the DOM to strip - which is why bold came back on a fresh line.
+function resetNoteTypingStyle(){
+  ['bold','italic','underline','strikeThrough'].forEach(cmd => {
+    try { if (document.queryCommandState(cmd)) document.execCommand(cmd, false, null); } catch(e){}
+  });
+  try {
+    const ink = getComputedStyle(document.getElementById('notebookEditor')).color;
+    const probe = document.createElement('span');
+    probe.style.color = document.queryCommandValue('foreColor');
+    document.body.appendChild(probe);
+    const typingColor = getComputedStyle(probe).color;
+    probe.remove();
+    if (typingColor && typingColor !== ink) document.execCommand('foreColor', false, ink);
+  } catch(e){}
+}
+function scheduleNotebookSave(){
+  clearTimeout(notebookSaveTimeout);
+  notebookSaveTimeout = setTimeout(async () => { saveCurrentNoteContent(); await saveNotebook(); }, 600);
+}
+function clearNoteFormatting(){
+  const editor = document.getElementById('notebookEditor');
+  editor.focus();
+  restoreNoteSelection();
+  const sel = window.getSelection();
+  if (!sel || sel.rangeCount === 0 || !editor.contains(sel.anchorNode)) return;
+  const lines = noteLinesInRange(editor, sel.getRangeAt(0));
+  if (!lines.length) return;
+  const anchor = [sel.anchorNode, sel.anchorOffset], focus = [sel.focusNode, sel.focusOffset];
+  lines.forEach(line => line.forEach(stripFormattingFrom));
+  // Text nodes survive unwrapping (they are only moved), so the selection can be put straight
+  // back. If the caret was on an unwrapped element (e.g. an empty <b><br></b>), fall back to
+  // the start of the first cleaned line.
+  if (editor.contains(anchor[0]) && editor.contains(focus[0])){
+    try { sel.setBaseAndExtent(anchor[0], anchor[1], focus[0], focus[1]); } catch(e){}
+  } else {
+    const first = lines[0].find(n => editor.contains(n)) || editor;
+    const r = document.createRange();
+    if (first.nodeType === Node.TEXT_NODE) r.setStart(first, 0); else r.selectNodeContents(first);
+    r.collapse(true);
+    sel.removeAllRanges(); sel.addRange(r);
+  }
+  captureNoteSelection();
+  resetNoteTypingStyle();
+  scheduleNotebookSave();
+}
+// A line emptied by deleting, or a new line from Enter, starts plain: leftover wrappers like
+// <b><br></b> are stripped and any remembered typing style is switched off.
+document.getElementById('notebookEditor').addEventListener('input', (e) => {
+  const t = e.inputType || '';
+  if (!(t.startsWith('delete') || t === 'insertParagraph' || t === 'insertLineBreak')) return;
+  const editor = document.getElementById('notebookEditor');
+  const sel = window.getSelection();
+  if (!sel || sel.rangeCount === 0 || !sel.isCollapsed || !editor.contains(sel.anchorNode)) return;
+  const lines = noteLinesInRange(editor, sel.getRangeAt(0));
+  if (lines.length > 1) return;
+  if (lines.length === 1){
+    const line = lines[0];
+    if (line.map(n => n.textContent).join('').replace(/[\u200B\uFEFF]/g, '') !== '') return;
+    const hasFormatting = line.some(n => n.nodeType === Node.ELEMENT_NODE &&
+      (NB_INLINE_FORMAT_TAGS.has(n.tagName) || n.hasAttribute('style') || n.querySelector('*:not(br)')));
+    if (hasFormatting){
+      line.forEach(stripFormattingFrom);
+      const block = line.length === 1 && line[0].nodeType === Node.ELEMENT_NODE && editor.contains(line[0]) ? line[0] : null;
+      const r = document.createRange();
+      if (block){ if (!block.firstChild) block.appendChild(document.createElement('br')); r.setStart(block, 0); }
+      else { const n = line.find(x => editor.contains(x)); if (n) r.setStartBefore(n); else r.setStart(editor, 0); }
+      r.collapse(true);
+      sel.removeAllRanges(); sel.addRange(r);
+    }
+  } else if (editor.textContent !== '') return;
+  resetNoteTypingStyle();
+});
+// Paste always comes in as plain text, so formatting from Outlook/Word/web pages (grey text,
+// odd fonts, hidden bold) can't sneak into the notes.
+document.getElementById('notebookEditor').addEventListener('paste', (e) => {
+  const data = e.clipboardData || window.clipboardData;
+  if (!data) return;
+  e.preventDefault();
+  const text = (data.getData('text/plain') || '').replace(/\r\n?/g, '\n');
+  if (!text) return;
+  let ok = false;
+  try { ok = document.execCommand('insertText', false, text); } catch(e2){}
+  if (!ok){
+    const sel = window.getSelection();
+    if (!sel || sel.rangeCount === 0) return;
+    const range = sel.getRangeAt(0);
+    range.deleteContents();
+    const node = document.createTextNode(text);
+    range.insertNode(node);
+    range.setStartAfter(node); range.collapse(true);
+    sel.removeAllRanges(); sel.addRange(range);
+  }
+  scheduleNotebookSave();
+});
 
 // ---------- new page modal ----------
 document.getElementById('notebookNewPageCancelBtn').addEventListener('click', () => document.getElementById('notebookNewPageModalBackdrop').classList.remove('open'));

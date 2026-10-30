@@ -2,6 +2,20 @@
   "previous_url": "",
   "versions": [
     {
+      "version": "1.6.2",
+      "date": "2026-10-30",
+      "notes_zh": [
+        "🧼 从邮件、Word、网页复制过来的字,现在一律以纯文本贴进记事本喵。灰色字、奇怪字体、偷偷藏起来的粗体,统统留在门外",
+        "🧹 工具栏多了一个 Tx 按钮:光标放在哪行就清哪行的格式,选中几行就清几行。全选再点一下,整页洗干净喵。以前贴进来的灰字也靠它救回来",
+        "🔁 删光一行粗体字以后,新起的一行不会再莫名其妙继续粗下去了喵。按回车开新行也一样从普通字开始,想要粗体就再点一次 B"
+      ],
+      "notes_en": [
+        "🧼 Anything pasted into the notebook from email, Word or web pages now comes in as plain text. Grey text, odd fonts and hidden bold stay outside",
+        "🧹 New Tx button on the toolbar: clears formatting on the line your cursor is on, or every line you've selected. Select all and tap it to wash the whole page — this is how you rescue the grey text pasted before",
+        "🔁 Deleting a whole bold line no longer leaves an invisible bold that follows you onto the next line. Pressing Enter also starts the new line plain — tap B again if you want bold"
+      ]
+    },
+    {
       "version": "1.6.1",
       "date": "2026-08-26",
       "notes_zh": [

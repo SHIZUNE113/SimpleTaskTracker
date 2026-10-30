@@ -887,4 +887,85 @@ suite('9. Period after a result ends the calculation (not a decimal point)', () 
   });
 });
 
+// =====================================================================
+suite('10. Notebook formatting hygiene', () => {
+  const openNotebook = async (w) => { click(w, $(w, '#notesBtn')); await settle(); };
+  const editor = (w) => $(w, '#notebookEditor');
+  const caretIn = (w, node, offset = 0) => {
+    const r = w.document.createRange(); r.setStart(node, offset); r.collapse(true);
+    const sel = w.getSelection(); sel.removeAllRanges(); sel.addRange(r);
+  };
+  const paste = (w, plain, html) => {
+    const ev = new w.Event('paste', { bubbles: true, cancelable: true });
+    ev.clipboardData = { getData: (t) => t === 'text/plain' ? plain : (t === 'text/html' ? (html || '') : '') };
+    editor(w).dispatchEvent(ev);
+    return ev;
+  };
+
+  test('pasting rich text inserts plain text only (no grey/bold carried over)', async () => {
+    const w = await boot({ seed: seeder([]) });
+    await openNotebook(w);
+    typeString(w, editor(w), 'x ');
+    const ev = paste(w, 'Grey pasted', '<span style="color:#777;font-weight:bold">Grey pasted</span>');
+    assert(ev.defaultPrevented, 'browser default rich paste was not blocked');
+    eq(editor(w).innerHTML, 'x Grey pasted', 'pasted content kept formatting or landed wrong');
+  });
+
+  test('pasted Windows line endings are normalised', async () => {
+    const w = await boot({ seed: seeder([]) });
+    await openNotebook(w);
+    caretIn(w, editor(w), 0);
+    paste(w, 'a\r\nb');
+    eq(editor(w).textContent, 'a\nb', 'CRLF not normalised');
+  });
+
+  test('pasted text is saved', async () => {
+    const w = await boot({ seed: seeder([]) });
+    await openNotebook(w);
+    caretIn(w, editor(w), 0);
+    paste(w, 'saved paste');
+    await new Promise(r => setTimeout(r, 700));
+    eq(JSON.parse(w.localStorage.getItem('notebook-pages-v1'))[0].content, 'saved paste', 'paste not autosaved');
+  });
+
+  test('clear formatting with the cursor on a line cleans only that line', async () => {
+    const w = await boot({ seed: seeder([]) });
+    await openNotebook(w);
+    editor(w).innerHTML = '<div><span style="color:#888">grey one</span></div><div><b>keep bold</b></div>';
+    caretIn(w, editor(w).querySelector('span').firstChild, 2);
+    click(w, $(w, '#nbClearFormatBtn'));
+    await settle();
+    eq(editor(w).innerHTML, '<div>grey one</div><div><b>keep bold</b></div>', 'wrong lines cleaned');
+  });
+
+  test('clear formatting over a selection cleans every touched line, keeping list structure', async () => {
+    const w = await boot({ seed: seeder([]) });
+    await openNotebook(w);
+    editor(w).innerHTML = '<b>first</b><div style="color:grey"><font color="#888">two</font></div><ul><li><u>three</u></li></ul>';
+    const r = w.document.createRange(); r.selectNodeContents(editor(w));
+    const sel = w.getSelection(); sel.removeAllRanges(); sel.addRange(r);
+    click(w, $(w, '#nbClearFormatBtn'));
+    await settle();
+    eq(editor(w).innerHTML, 'first<div>two</div><ul><li>three</li></ul>', 'formatting left behind or structure lost');
+  });
+
+  test('a line emptied by deleting drops leftover formatting wrappers', async () => {
+    const w = await boot({ seed: seeder([]) });
+    await openNotebook(w);
+    editor(w).innerHTML = '<div>keep</div><div><b><br></b></div>';
+    caretIn(w, editor(w).querySelector('b'), 0);
+    editor(w).dispatchEvent(new w.InputEvent('input', { bubbles: true, inputType: 'deleteContentBackward' }));
+    eq(editor(w).innerHTML, '<div>keep</div><div><br></div>', 'empty line kept its bold wrapper');
+  });
+
+  test('ordinary typing never strips formatting', async () => {
+    const w = await boot({ seed: seeder([]) });
+    await openNotebook(w);
+    editor(w).innerHTML = '<div><b>bold</b></div>';
+    caretIn(w, editor(w).querySelector('b').firstChild, 4);
+    editor(w).dispatchEvent(new w.InputEvent('input', { bubbles: true, inputType: 'insertText', data: 'x' }));
+    eq(editor(w).innerHTML, '<div><b>bold</b></div>', 'typing stripped formatting');
+  });
+});
+
 run();
