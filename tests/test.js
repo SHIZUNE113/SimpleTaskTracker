@@ -966,6 +966,19 @@ suite('10. Notebook formatting hygiene', () => {
     editor(w).dispatchEvent(new w.InputEvent('input', { bubbles: true, inputType: 'insertText', data: 'x' }));
     eq(editor(w).innerHTML, '<div><b>bold</b></div>', 'typing stripped formatting');
   });
+
+  test('Ctrl+B / Ctrl+U are claimed by the editor so the browser never opens bookmarks', async () => {
+    const w = await boot({ seed: seeder([]) });
+    await openNotebook(w);
+    for (const [key, extra] of [['b', {}], ['u', {}], ['b', { metaKey: true, ctrlKey: false }]]) {
+      const ev = new w.KeyboardEvent('keydown', Object.assign({ key, code: 'Key' + key.toUpperCase(), ctrlKey: true, bubbles: true, cancelable: true }, extra));
+      editor(w).dispatchEvent(ev);
+      assert(ev.defaultPrevented, `shortcut ${key} not intercepted`);
+    }
+    const plain = new w.KeyboardEvent('keydown', { key: 'b', bubbles: true, cancelable: true });
+    editor(w).dispatchEvent(plain);
+    assert(!plain.defaultPrevented, 'plain "b" keystroke was swallowed');
+  });
 });
 
 run();

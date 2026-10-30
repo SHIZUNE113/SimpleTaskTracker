@@ -2,6 +2,16 @@
   "previous_url": "",
   "versions": [
     {
+      "version": "1.6.3",
+      "date": "2026-10-30",
+      "notes_zh": [
+        "⌨️ 记事本里按 Ctrl+B 终于是加粗了,不会再把书签栏甩你脸上喵。Ctrl+U 下划线也一起接管了(Mac 上是 Cmd)"
+      ],
+      "notes_en": [
+        "⌨️ Ctrl+B in the notebook now actually means bold, instead of throwing your bookmarks at you. Ctrl+U for underline too (Cmd on Mac)"
+      ]
+    },
+    {
       "version": "1.6.2",
       "date": "2026-10-30",
       "notes_zh": [

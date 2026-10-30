@@ -468,7 +468,7 @@ let updateModalShowing = false;
 // Bump APP_VERSION on every release. Point VERSION_CHECK_URL at a version.json file hosted
 // alongside this html (e.g. on GitHub Pages) once you set that up - leave it blank to disable
 // the update-check entirely (the app works fine either way).
-const APP_VERSION = '1.6.2';
+const APP_VERSION = '1.6.3';
 const VERSION_CHECK_URL = 'https://shizune113.github.io/SimpleTaskTracker/version.json';
 
 // DATA_VERSION is separate from APP_VERSION: bump this only when the *shape* of saved data
@@ -1467,6 +1467,18 @@ document.getElementById('nbBulletBtn').addEventListener('click', () => runNoteCo
 document.getElementById('nbColorInput').addEventListener('mousedown', captureNoteSelection);
 document.getElementById('nbColorInput').addEventListener('input', (e) => runNoteCommand('foreColor', e.target.value));
 document.getElementById('nbClearFormatBtn').addEventListener('click', clearNoteFormatting);
+// Ctrl/Cmd+B and +U are claimed here before the browser sees them - otherwise Chrome and
+// Firefox treat Ctrl+B as "open bookmarks" instead of bold.
+document.getElementById('notebookEditor').addEventListener('keydown', (e) => {
+  if (!(e.ctrlKey || e.metaKey) || e.altKey || e.shiftKey) return;
+  const key = (e.key || '').toLowerCase();
+  const cmd = (key === 'b' || e.code === 'KeyB') ? 'bold' : (key === 'u' || e.code === 'KeyU') ? 'underline' : null;
+  if (!cmd) return;
+  e.preventDefault();
+  e.stopPropagation();
+  captureNoteSelection();
+  runNoteCommand(cmd);
+});
 
 // ---------- notebook formatting hygiene ----------
 // Inline wrappers that only carry formatting - safe to unwrap. Block elements (div/p/li/ul)
