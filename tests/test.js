@@ -981,4 +981,118 @@ suite('10. Notebook formatting hygiene', () => {
   });
 });
 
+// =====================================================================
+suite('11. Rename client', () => {
+  const K3 = { notes: 'client-notes-v1' };
+  const renameBtn = (w, id) => $$(w, '.rename-btn').find(b => b.dataset.rename === id);
+  const renameOpen = (w) => $(w, '#renameModalBackdrop').classList.contains('open');
+  const visible = (w, id) => $(w, '#' + id).style.display !== 'none';
+  const saved = (w) => JSON.parse(w.localStorage.getItem(K.tasks));
+  const savedArch = (w) => JSON.parse(w.localStorage.getItem(K.archive));
+  const hist = (over = {}) => Object.assign({ id: 'a1', chainId: 'c_bas', client: 'Acme Pty Ltd', type: 'BAS', period: 'Q4 Apr-Jun 2025', who: '我', completedAt: '2025-08-20', archivedAt: '2025-08-20' }, over);
+  async function rename(w, id, name, btn) {
+    click(w, renameBtn(w, id)); await settle();
+    $(w, '#renameInput').value = name;
+    click(w, $(w, '#' + btn)); await settle();
+  }
+
+  test('pencil opens the rename modal; clicking the name still opens the client note', async () => {
+    const w = await boot({ seed: seeder([basTask()]) });
+    click(w, renameBtn(w, 't_bas1')); await settle();
+    assert(renameOpen(w), 'rename modal did not open');
+    eq($(w, '#renameInput').value, 'Acme Pty Ltd', 'input not prefilled');
+    assert(!$(w, '#taskNoteModalBackdrop').classList.contains('open'), 'task note opened too');
+    click(w, $(w, '#renameCancelBtn')); await settle();
+    click(w, $(w, '.client[data-client]')); await settle();
+    assert($(w, '#noteModalBackdrop').classList.contains('open'), 'client note regressed');
+  });
+
+  test('a fresh chain (no history) renames directly with a single Save', async () => {
+    const w = await boot({ seed: seeder([basTask()]) });
+    click(w, renameBtn(w, 't_bas1')); await settle();
+    assert(visible(w, 'renameActionsSimple') && !visible(w, 'renameActionsChain'), 'asked a question with no history');
+    $(w, '#renameInput').value = 'Acme Holdings Pty Ltd';
+    click(w, $(w, '#renameSaveBtn')); await settle();
+    eq(saved(w)[0].client, 'Acme Holdings Pty Ltd', 'not renamed');
+    assert(!renameOpen(w), 'modal stayed open');
+  });
+
+  test('a chain with history asks, and "from this period on" leaves the archive alone', async () => {
+    const w = await boot({ seed: seeder([basTask()], [hist()]) });
+    click(w, renameBtn(w, 't_bas1')); await settle();
+    assert(visible(w, 'renameActionsChain') && !visible(w, 'renameActionsSimple'), 'did not ask about history');
+    assert($(w, '#renameHistoryHint').textContent.includes('1'), 'history count missing');
+    $(w, '#renameInput').value = 'New Co';
+    click(w, $(w, '#renameForwardBtn')); await settle();
+    eq(saved(w)[0].client, 'New Co', 'live task not renamed');
+    eq(savedArch(w)[0].client, 'Acme Pty Ltd', 'history was rewritten');
+  });
+
+  test('"everything" rewrites the chain history too', async () => {
+    const w = await boot({ seed: seeder([basTask()], [hist()]) });
+    await rename(w, 't_bas1', 'New Co', 'renameAllBtn');
+    eq(saved(w)[0].client, 'New Co', 'live task not renamed');
+    eq(savedArch(w)[0].client, 'New Co', 'history not renamed');
+  });
+
+  test('a same-name twin chain is untouched, live and archived', async () => {
+    const tasks = [basTask({ id: 't_a', chainId: 'A', client: 'Smith Family Trust' }), basTask({ id: 't_b', chainId: 'B', client: 'Smith Family Trust' })];
+    const arch = [hist({ id: 'a_a', chainId: 'A', client: 'Smith Family Trust' }), hist({ id: 'a_b', chainId: 'B', client: 'Smith Family Trust' })];
+    const w = await boot({ seed: seeder(tasks, arch) });
+    await rename(w, 't_a', 'Smith Discretionary Trust', 'renameAllBtn');
+    eq(saved(w).find(t => t.id === 't_b').client, 'Smith Family Trust', 'twin live task renamed');
+    eq(savedArch(w).find(a => a.id === 'a_b').client, 'Smith Family Trust', 'twin history renamed');
+    eq(savedArch(w).find(a => a.id === 'a_a').client, 'Smith Discretionary Trust', 'own history not renamed');
+  });
+
+  test('the next auto-generated period keeps the new name', async () => {
+    const w = await boot({ seed: seeder([basTask()]) });
+    await rename(w, 't_bas1', 'New Co', 'renameSaveBtn');
+    click(w, $(w, '.done-btn:not([disabled])')); await settle();
+    eq(saved(w)[0].client, 'New Co', 'successor reverted to the old name');
+  });
+
+  test('legacy chain (no chainId) renamed forward still restores as one chain', async () => {
+    const w = await boot({ seed: seeder([basTask({ chainId: null })], [hist({ chainId: null })]) });
+    await rename(w, 't_bas1', 'New Co', 'renameForwardBtn');
+    const t = saved(w)[0], a = savedArch(w)[0];
+    assert(t.chainId && t.chainId === a.chainId, 'chain link lost after rename');
+    eq(a.client, 'Acme Pty Ltd', 'history renamed on forward-only');
+    click(w, $(w, '.tab[data-tab="archive"]')); await settle();
+    click(w, $(w, '.restore-btn:not([disabled])')); await settle();
+    eq(saved(w).length, 1, 'restore left a duplicate - chain link broken');
+  });
+
+  test('client note moves to the new name once the old name is gone', async () => {
+    const w = await boot({ seed: (ls) => { seeder([basTask()])(ls); ls.setItem(K3.notes, JSON.stringify({ 'Acme Pty Ltd': 'nice client' })); } });
+    await rename(w, 't_bas1', 'New Co', 'renameSaveBtn');
+    eq(JSON.parse(w.localStorage.getItem(K3.notes)), { 'New Co': 'nice client' }, 'note not carried over');
+  });
+
+  test('client note is copied, not moved, while another chain still uses the old name', async () => {
+    const tasks = [basTask(), basTask({ id: 't_ret', chainId: 'c_ret', type: 'Return', period: 'FY25-26' })];
+    const w = await boot({ seed: (ls) => { seeder(tasks)(ls); ls.setItem(K3.notes, JSON.stringify({ 'Acme Pty Ltd': 'nice client' })); } });
+    await rename(w, 't_bas1', 'New Co', 'renameSaveBtn');
+    eq(JSON.parse(w.localStorage.getItem(K3.notes)), { 'Acme Pty Ltd': 'nice client', 'New Co': 'nice client' }, 'note handling wrong');
+    eq(saved(w).find(t => t.id === 't_ret').client, 'Acme Pty Ltd', 'other chain of the same client renamed');
+  });
+
+  test('empty name is refused and nothing changes', async () => {
+    const w = await boot({ seed: seeder([basTask()]) });
+    await rename(w, 't_bas1', '   ', 'renameSaveBtn');
+    eq(saved(w)[0].client, 'Acme Pty Ltd', 'renamed to blank');
+    assert(renameOpen(w), 'modal closed on a refused name');
+  });
+
+  test('renaming during the 5s undo window: undo brings the task back under the new name', async () => {
+    const w = await boot({ seed: seeder([basTask()]) });
+    click(w, $(w, '.done-btn:not([disabled])')); await settle();
+    await rename(w, saved(w)[0].id, 'New Co', 'renameForwardBtn');
+    click(w, $(w, '#undoBtn')); await settle();
+    const t = saved(w);
+    eq(t.length, 1, 'undo left a duplicate');
+    eq(t[0].client, 'New Co', 'undo resurrected the old name');
+  });
+});
+
 run();

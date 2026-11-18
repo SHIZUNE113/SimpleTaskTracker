@@ -73,6 +73,9 @@
   .client-row { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }
   .card .client { font-size: 14.5px; font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; gap: 5px; }
   .card .client:hover { text-decoration: underline; text-decoration-style: dotted; }
+  .rename-btn { font-size: 12px; color: var(--ink-soft); opacity: 0.4; cursor: pointer; padding: 0 3px; border-radius: 4px; }
+  .rename-btn:hover { opacity: 1; background: #eef0f2; }
+  .rename-history-hint { color: var(--ink-soft); font-size: 12px; margin: 0 0 4px; }
   .note-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--oth); display: inline-block; }
   .task-note-preview { font-size: 12px; color: #9aa4af; font-weight: 400; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 220px; }
   .linked-tag { font-size: 11.5px; color: var(--ink-soft); font-weight: 500; }
@@ -383,6 +386,24 @@
   </div>
 </div>
 
+<div class="modal-backdrop" id="renameModalBackdrop">
+  <div class="modal">
+    <h2 data-i18n="renameTitle">修改客户名</h2>
+    <p id="renameSubtitle" style="color:var(--ink-soft);font-size:13px;margin:0 0 8px;"></p>
+    <div class="field"><input id="renameInput" data-i18n-placeholder="renamePlaceholder" placeholder="新的客户名"></div>
+    <p class="rename-history-hint" id="renameHistoryHint"></p>
+    <div class="modal-actions" id="renameActionsSimple">
+      <button class="btn-cancel" id="renameCancelBtn" data-i18n="btnCancel">取消</button>
+      <button class="btn-save" id="renameSaveBtn" data-i18n="btnSave">保存</button>
+    </div>
+    <div class="modal-actions" id="renameActionsChain" style="flex-wrap:wrap;">
+      <button class="btn-cancel" id="renameChainCancelBtn" data-i18n="btnCancel" style="flex-basis:100%;order:3;">取消</button>
+      <button class="btn-save" id="renameForwardBtn" data-i18n="renameForwardBtn">从这期开始改</button>
+      <button class="btn-save" id="renameAllBtn" data-i18n="renameAllBtn">全部改(含历史)</button>
+    </div>
+  </div>
+</div>
+
 <div class="modal-backdrop" id="addPersonModalBackdrop">
   <div class="modal">
     <h2 data-i18n="addPersonModalTitle">新增负责人</h2>
@@ -468,7 +489,7 @@ let updateModalShowing = false;
 // Bump APP_VERSION on every release. Point VERSION_CHECK_URL at a version.json file hosted
 // alongside this html (e.g. on GitHub Pages) once you set that up - leave it blank to disable
 // the update-check entirely (the app works fine either way).
-const APP_VERSION = '1.6.2';
+const APP_VERSION = '1.6.3';
 const VERSION_CHECK_URL = 'https://shizune113.github.io/SimpleTaskTracker/version.json';
 
 // DATA_VERSION is separate from APP_VERSION: bump this only when the *shape* of saved data
@@ -565,6 +586,10 @@ const I18N = {
     reassignTitle: '转移负责人',
     reassignHint: '会套用到这条任务链:当前任务和之后自动生成的每一期。历史记录保持原样。',
     toastReassigned: '已转给 {name}', toastReassignSame: '本来就是这个人喵',
+    renameTitle: '修改客户名', renamePlaceholder: '新的客户名', renameTooltip: '改名',
+    renameHistoryHint: '这条任务链已经有 {n} 条完成记录。要从这一期开始改,还是连历史记录一起改?',
+    renameForwardBtn: '从这期开始改', renameAllBtn: '全部改(含历史)',
+    toastRenamed: '已改名为 {name}', toastRenameEmpty: '名字不能是空的喵',
     notebookTitle: '记事本', btnManagePages: '管理页面', notebookSearchPlaceholder: '搜索标题或内容...',
     notebookEditorPlaceholder: '随便写点什么...', notebookNewPageTitle: '新建页面', notebookPageNamePlaceholder: '给这页起个名字',
     quickNoteName: 'Quick Note', pinNote: '固定页面,不能改名或删除',
@@ -613,6 +638,10 @@ const I18N = {
     reassignTitle: 'Reassign',
     reassignHint: 'Applies to the whole chain: this task and every future period it spawns. Archive history is left as-is.',
     toastReassigned: 'Reassigned to {name}', toastReassignSame: 'Already assigned to them',
+    renameTitle: 'Rename client', renamePlaceholder: 'New client name', renameTooltip: 'Rename',
+    renameHistoryHint: 'This chain already has {n} completed record(s). Rename from this period on, or rewrite the history too?',
+    renameForwardBtn: 'From this period on', renameAllBtn: 'Everything (incl. history)',
+    toastRenamed: 'Renamed to {name}', toastRenameEmpty: 'The name can\'t be empty',
     notebookTitle: 'Quick Notes', btnManagePages: 'Manage pages', notebookSearchPlaceholder: 'Search titles or content...',
     notebookEditorPlaceholder: 'Write anything...', notebookNewPageTitle: 'New page', notebookPageNamePlaceholder: 'Name this page',
     quickNoteName: 'Quick Note', pinNote: 'Pinned page — can\'t be renamed or deleted',
@@ -1746,6 +1775,7 @@ function render(){
         <div class="main">
           <div class="client-row">
             <span class="client" data-client="${escapeHtml(t.client)}">${escapeHtml(t.client)}${hasClientNote ? '<span class="note-dot" title="note"></span>' : ''}</span>
+            <span class="rename-btn" data-rename="${t.id}" title="${escapeHtml(tr('renameTooltip'))}">✎</span>
             ${taskNoteFirstLine ? `<span class="task-note-preview">${escapeHtml(taskNoteFirstLine)}</span>` : ''}
           </div>
           ${t.linkedClient ? `<div class="linked-tag">${tr('labelLinkedShort')} ${escapeHtml(t.linkedClient)}</div>` : ''}
@@ -1774,6 +1804,7 @@ function render(){
         if (e.target.closest('.status-select')) return;
         if (e.target.closest('.client[data-client]')) return;
         if (e.target.closest('.who[data-reassign]')) return;
+        if (e.target.closest('.rename-btn')) return;
         openTaskNoteModal(t.id);
       });
       row.appendChild(delBtn);
@@ -1803,7 +1834,94 @@ function render(){
   container.querySelectorAll('.who[data-reassign]').forEach(el => {
     el.addEventListener('click', (e) => { e.stopPropagation(); openReassignModal(el.dataset.reassign); });
   });
+  container.querySelectorAll('.rename-btn[data-rename]').forEach(el => {
+    el.addEventListener('click', (e) => { e.stopPropagation(); openRenameModal(el.dataset.rename); });
+  });
 }
+
+// ---------- rename client (per chain) ----------
+// Renames follow the chain, not the name: two "Smith Family Trust" chains stay separate.
+// A chain with no completed history is just renamed. One with history asks whether the
+// archive should be rewritten too, or keep the name it was completed under.
+let renameEditingId = null;
+function renameScope(t){
+  const live = t.type === 'Other' ? [t] : tasks.filter(x => sameChain(t, x));
+  const history = t.type === 'Other' ? [] : archive.filter(a => sameChain(t, a));
+  return { live, history };
+}
+function openRenameModal(id){
+  const t = tasks.find(x => x.id === id); if (!t) return;
+  renameEditingId = id;
+  const { history } = renameScope(t);
+  document.getElementById('renameSubtitle').textContent = `${t.client} · ${t.period || typeLabel(t.type)}`;
+  document.getElementById('renameInput').value = t.client;
+  const hint = document.getElementById('renameHistoryHint');
+  hint.textContent = history.length ? tr('renameHistoryHint').replace('{n}', history.length) : '';
+  hint.style.display = history.length ? '' : 'none';
+  document.getElementById('renameActionsSimple').style.display = history.length ? 'none' : '';
+  document.getElementById('renameActionsChain').style.display = history.length ? '' : 'none';
+  document.getElementById('renameModalBackdrop').classList.add('open');
+  const input = document.getElementById('renameInput');
+  input.focus(); input.select();
+}
+function closeRenameModal(){
+  document.getElementById('renameModalBackdrop').classList.remove('open');
+  renameEditingId = null;
+}
+async function applyRename(includeHistory){
+  const t = tasks.find(x => x.id === renameEditingId);
+  if (!t){ closeRenameModal(); return; }
+  const newName = document.getElementById('renameInput').value.trim();
+  if (!newName){ showToast(tr('toastRenameEmpty')); return; }
+  const oldName = t.client;
+  if (newName === oldName){ closeRenameModal(); return; }
+  const { live, history } = renameScope(t);
+  // A legacy chain (no chainId) is only held together by client+type, which the rename is
+  // about to break. Give the whole chain - archive included - one chainId first, so restore
+  // and the tip check still see it as one lineage afterwards.
+  if (t.type !== 'Other' && !t.chainId){
+    const cid = genChainId();
+    live.forEach(x => { if (!x.chainId) x.chainId = cid; });
+    history.forEach(a => { if (!a.chainId) a.chainId = cid; });
+  }
+  // A pending 5s undo would bring the just-completed task back into the active list, which
+  // is "from this period on" - so it takes the new name either way.
+  const undoTask = lastAction && lastAction.originalTask;
+  if (undoTask && t.type !== 'Other' && (undoTask.chainId ? undoTask.chainId === t.chainId : (undoTask.client === oldName && undoTask.type === t.type))){
+    undoTask.client = newName;
+    if (!undoTask.chainId) undoTask.chainId = t.chainId;
+  }
+  live.forEach(x => { x.client = newName; });
+  if (includeHistory) history.forEach(a => { a.client = newName; });
+
+  const stillUsed = tasks.some(x => x.client === oldName) || archive.some(a => a.client === oldName);
+  // Client notes are keyed by name: carry the note over, and drop the old key only once
+  // nothing else still goes by the old name.
+  if (clientNotes[oldName] && !clientNotes[newName]) clientNotes[newName] = clientNotes[oldName];
+  if (!stillUsed) delete clientNotes[oldName];
+  // "Linked: X" tags on other clients follow the rename once the old name is gone entirely.
+  if (!stillUsed){
+    tasks.forEach(x => { if (x.linkedClient === oldName) x.linkedClient = newName; });
+    archive.forEach(a => { if (a.linkedClient === oldName) a.linkedClient = newName; });
+  }
+  await saveTasks(); await saveArchive(); await saveNotes();
+  closeRenameModal();
+  render();
+  renderArchive(document.getElementById('archiveSearch').value);
+  showToast(tr('toastRenamed').replace('{name}', newName));
+}
+document.getElementById('renameSaveBtn').addEventListener('click', () => applyRename(false));
+document.getElementById('renameForwardBtn').addEventListener('click', () => applyRename(false));
+document.getElementById('renameAllBtn').addEventListener('click', () => applyRename(true));
+document.getElementById('renameCancelBtn').addEventListener('click', closeRenameModal);
+document.getElementById('renameChainCancelBtn').addEventListener('click', closeRenameModal);
+document.getElementById('renameInput').addEventListener('keydown', (e) => {
+  if (e.key !== 'Enter') return;
+  e.preventDefault();
+  // Enter only saves outright when there's no history to decide about.
+  if (document.getElementById('renameActionsSimple').style.display !== 'none') applyRename(false);
+});
+document.getElementById('renameModalBackdrop').addEventListener('click', (e) => { if (e.target.id === 'renameModalBackdrop') closeRenameModal(); });
 
 // ---------- delete (with confirm) ----------
 let deleteEditingId = null;

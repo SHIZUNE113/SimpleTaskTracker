@@ -2,6 +2,20 @@
   "previous_url": "",
   "versions": [
     {
+      "version": "1.6.3",
+      "date": "2026-11-18",
+      "notes_zh": [
+        "✎ 客户名旁边多了一支小笔,点它就能改名喵。点名字本身还是打开客户备注,老习惯不用改",
+        "🔗 改名跟着任务链走:新建的链直接改;已经有完成记录的,会问你「从这期开始改」还是「全部改(含历史)」。同名的另一条链(比如两个 Smith Family Trust)不会被误伤喵",
+        "📎 客户备注会跟着新名字走,其他客户的「Linked」标签也会一起更新"
+      ],
+      "notes_en": [
+        "✎ A small pencil next to the client name lets you rename it. Clicking the name itself still opens the client note, same as before",
+        "🔗 Renames follow the chain: a fresh chain just renames; one with completed history asks \"from this period on\" or \"everything (incl. history)\". A same-name twin chain (say, two Smith Family Trusts) is left alone",
+        "📎 The client note moves to the new name, and other clients' \"Linked\" tags update along with it"
+      ]
+    },
+    {
       "version": "1.6.2",
       "date": "2026-10-30",
       "notes_zh": [
