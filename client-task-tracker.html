@@ -490,7 +490,10 @@ let updateModalShowing = false;
 // alongside this html (e.g. on GitHub Pages) once you set that up - leave it blank to disable
 // the update-check entirely (the app works fine either way).
 const APP_VERSION = '1.6.3';
-const VERSION_CHECK_URL = 'https://shizune113.github.io/SimpleTaskTracker/version.json';
+// The portable exe (desktop/) sets this flag before the page runs. It bundles its own copy
+// of version.json and is not allowed any network access, so the update check reads that.
+const IS_DESKTOP = window.__TASKTRACKER_DESKTOP__ === true;
+const VERSION_CHECK_URL = IS_DESKTOP ? 'version.json' : 'https://shizune113.github.io/SimpleTaskTracker/version.json';
 
 // DATA_VERSION is separate from APP_VERSION: bump this only when the *shape* of saved data
 // changes (a field renamed/restructured - not just a new optional field added, since
@@ -602,6 +605,7 @@ const I18N = {
     backupReminder: '距上次备份 {days} 天了,建议导出一份', backupReminderNever: '还没有导出过备份,建议现在导出一份',
     backupWarnTitle: '已经 {days} 天没有备份了喵!!强烈建议现在导出一份!!', backupWarnNever: '你还从来没有导出过备份喵!!强烈建议现在导出一份!!',
     backupWarnSub: '数据只存在这台电脑的这个浏览器里,清缓存或换设备就会全部消失喵', backupWarnLater: '之后再说', backupWarnExport: '立即备份',
+    dataWarningDesktop: '💾 数据保存在 exe 旁边的 <strong>TaskTrackerData</strong> 文件夹里,每天自动备份到 backups(保留最近 30 天)。换电脑时把整个文件夹一起带走就行',
     dataWarning: '⚠️ 数据<strong>只</strong>存在<strong>当前这台电脑的这个浏览器</strong>里——换浏览器、换电脑、清理浏览器缓存/记录都会导致列表消失,请养成定期导出备份的习惯',
     deleteConfirmTitle: '删除任务', deleteConfirmBodyTpl: '确定要删除「{client} — {period}」吗?之后自动生成的后续任务也不会再出现了。',
     btnDelete: '删除'
@@ -654,6 +658,7 @@ const I18N = {
     backupReminder: "It's been {days} days since your last backup — worth exporting one", backupReminderNever: "You haven't exported a backup yet — worth doing one now",
     backupWarnTitle: "It's been {days} days since your last backup! Please export one now!", backupWarnNever: "You've never exported a backup! Please export one now!",
     backupWarnSub: 'Your data lives only in this browser on this computer — clearing browser data or switching devices wipes it all.', backupWarnLater: 'Later', backupWarnExport: 'Back up now',
+    dataWarningDesktop: '💾 Your data is saved in the <strong>TaskTrackerData</strong> folder next to the exe, with an automatic daily backup in backups (last 30 days kept). To move computers, take the whole folder along',
     dataWarning: '⚠️ Your data lives <strong>ONLY</strong> in <strong>THIS</strong> browser on <strong>THIS</strong> computer — switching browsers/computers or clearing browser data will wipe the list. Export backups regularly!',
     deleteConfirmTitle: 'Delete task', deleteConfirmBodyTpl: 'Delete "{client} — {period}"? Any future auto-generated follow-up tasks will also stop appearing.',
     btnDelete: 'Delete'
@@ -663,7 +668,7 @@ function tr(key){ return (I18N[currentLang] && I18N[currentLang][key]) || key; }
 function personLabel(name){ return name === '我' ? tr('personMe') : name; }
 function checkBackupReminder(){
   const bar = document.getElementById('backupReminderBar');
-  if (tasks.length === 0 && archive.length === 0){ bar.style.display = 'none'; return; }
+  if (IS_DESKTOP || (tasks.length === 0 && archive.length === 0)){ bar.style.display = 'none'; return; }
   let lastExport = null;
   try { lastExport = localStorage.getItem(LAST_EXPORT_KEY); } catch(e){}
   if (!lastExport){
@@ -691,7 +696,7 @@ function translatePage(){
   });
   document.getElementById('langToggleBtn').textContent = currentLang === 'zh' ? 'EN' : '中文';
   document.getElementById('footerVersion').textContent = 'v' + APP_VERSION;
-  document.getElementById('dataWarningEl').innerHTML = tr('dataWarning');
+  document.getElementById('dataWarningEl').innerHTML = tr(IS_DESKTOP ? 'dataWarningDesktop' : 'dataWarning');
   renderWhoFilterChips();
   renderSortModeChips();
   if (document.getElementById('notebookModalBackdrop').classList.contains('open')) renderNotebookPages();
@@ -2367,7 +2372,7 @@ document.getElementById('archiveSort').addEventListener('click', (e) => {
 // sequenced to appear AFTER the update popup so it can't be mistaken for the patch notes
 // and dismissed on autopilot.
 function backupOverdueDays(){
-  if (tasks.length === 0 && archive.length === 0) return null;
+  if (IS_DESKTOP || (tasks.length === 0 && archive.length === 0)) return null;
   let lastExport = null;
   try { lastExport = localStorage.getItem(LAST_EXPORT_KEY); } catch(e){}
   if (!lastExport) return 'never';

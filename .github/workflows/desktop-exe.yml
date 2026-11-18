@@ -1,0 +1,44 @@
+# Builds the portable Windows exe from the repo's own files. Run by hand (Actions tab ->
+# "Build desktop exe" -> Run workflow). The build only sees what is committed here - the html,
+# version.json, mascot.mp4 and desktop/ - never anyone's task data, which only ever lives
+# in the TaskTrackerData folder on the computer running the exe.
+name: Build desktop exe
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - name: Install Tauri CLI
+        working-directory: desktop
+        run: npm ci
+
+      - name: Build
+        working-directory: desktop
+        run: npx tauri build --no-bundle
+
+      - name: Package
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force out | Out-Null
+          Copy-Item desktop/src-tauri/target/release/task-tracker.exe out/TaskTracker.exe
+          Copy-Item desktop/README.txt out/README.txt
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: TaskTracker-windows
+          path: out/
+          retention-days: 90

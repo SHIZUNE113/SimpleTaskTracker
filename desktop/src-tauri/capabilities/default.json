@@ -1,0 +1,7 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "default",
+  "description": "No plugin permissions: the page can only call this app's own storage commands.",
+  "windows": ["main"],
+  "permissions": []
+}
