@@ -99,6 +99,16 @@ fn storage_set(store: State<Store>, key: String, value: String) -> Result<(), St
     })
 }
 
+// The bundled page is served from tauri://localhost (Linux/macOS) or
+// http://tauri.localhost (Windows). blob:/data: cover the backup export.
+fn is_local_url(url: &tauri::Url) -> bool {
+    match url.scheme() {
+        "tauri" | "about" | "blob" | "data" => true,
+        "http" | "https" => url.host_str() == Some("tauri.localhost"),
+        _ => false,
+    }
+}
+
 fn data_dir() -> PathBuf {
     let exe = std::env::current_exe().expect("cannot locate the exe");
     exe.parent().unwrap_or(Path::new(".")).join("TaskTrackerData")
@@ -140,6 +150,20 @@ fn main() {
                 .min_inner_size(420.0, 500.0)
                 .data_directory(dir.join("webview"))
                 .initialization_script(BRIDGE)
+                // Belt and braces on top of the CSP: the window may never leave the bundled
+                // page or open another one, so no link can take it (or anything) online.
+                .on_navigation(is_local_url)
+                .on_new_window(|_, _| tauri::webview::NewWindowResponse::Deny)
+                .browser_extensions_enabled(false)
+                // WebView2 (Windows only; ignored elsewhere). The first switch is wry's default
+                // (SmartScreen's URL lookups off) and must be repeated when overriding; the rest
+                // switch off Chromium's background traffic: component and safe-browsing
+                // updates, error-reporting pings and hyperlink-auditing pings.
+                .additional_browser_args(
+                    "--disable-features=msWebOOUI,msPdfOOUI,msSmartScreenProtection \
+                     --disable-background-networking --disable-component-update \
+                     --disable-domain-reliability --no-pings",
+                )
                 .build()?;
             Ok(())
         })

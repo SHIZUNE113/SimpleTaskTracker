@@ -2450,7 +2450,7 @@ async function checkForUpdate(){
     backupBtn.textContent = tr('updateBackupBtn');
 
     const rollbackWrap = document.getElementById('updateRollbackWrap');
-    if (data.previous_url){
+    if (data.previous_url && !IS_DESKTOP){ // a web link - the exe can't (and mustn't) follow it
       document.getElementById('updateRollbackLink').href = data.previous_url;
       rollbackWrap.style.display = '';
     } else {
